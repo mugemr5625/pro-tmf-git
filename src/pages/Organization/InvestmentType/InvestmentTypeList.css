@@ -1,0 +1,292 @@
+/* InvestmentTypeList Component Styles */
+
+.inv-type-list-page-content {
+  padding: 0;
+  margin: 0;
+}
+
+.inv-type-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0;
+  margin-left: 0;
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.inv-type-list-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.inv-type-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+
+.inv-type-list-modal-title {
+  text-align: center;
+  width: 100%;
+}
+
+.inv-type-list-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inv-type-list-modal-label {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* ── Scrollable container ──────────────────────────────────────────────────── */
+
+.inv-type-list-scrollable-div {
+  height: 500px;
+  width: auto;
+  overflow: auto;
+  padding: 10px;
+  margin-top: 20px;
+}
+
+/* ── Line group card ───────────────────────────────────────────────────────── */
+
+.inv-type-list-line-group {
+  margin-bottom: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+}
+
+.inv-type-list-line-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 5px 10px 10px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.inv-type-list-line-title-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 5px;
+}
+
+.inv-type-list-line-title {
+  font-weight: 600;
+  font-size: 22px;
+  color: #262626;
+}
+
+.inv-type-list-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 19px;
+  background-color: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+  font-size: 22px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.2s;
+  margin-right: 20px;
+}
+
+/* ── Infinite scroll inner container ──────────────────────────────────────── */
+
+.inv-type-list-container {
+  max-height: 400px;
+  overflow: auto;
+  padding: 0;
+}
+
+.inv-type-list-skeleton {
+  text-align: center;
+  padding: 16px;
+}
+
+/* ── Divider ───────────────────────────────────────────────────────────────── */
+
+.inv-type-list-divider {
+  margin: 16px 0;
+}
+
+.inv-type-list-divider-star {
+  color: red;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.inv-type-list-divider-text {
+  color: #595959;
+  font-size: 14px;
+}
+
+.inv-type-list-divider-line-name {
+  font-weight: 600;
+  color: #262626;
+}
+
+/* ── List items ────────────────────────────────────────────────────────────── */
+
+.inv-type-list {
+  background: #fafafa;
+  margin: 0;
+}
+
+.inv-type-list-item-wrapper {
+  border-bottom: 2px solid #f0f0f0;
+  padding: 0;
+  background: #fff;
+}
+
+.inv-type-list-item {
+  background: #fff;
+  cursor: default;
+  padding: 12px 16px;
+}
+
+.inv-type-list-item-expanded {
+  background: #f9f9f9;
+}
+
+.inv-type-list-avatar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.inv-type-list-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background-color: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+  font-size: 20px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.2s;
+}
+
+.inv-type-list-item-title-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  margin-left: 10px;
+  margin-right: 30px;
+}
+
+.inv-type-list-item-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: black;
+}
+
+.inv-type-list-ellipsis-icon {
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+}
+
+.inv-type-list-collapse-content {
+  margin-top: 6px;
+  padding: 0;
+  background: #f9f9f9;
+}
+
+/* ── Empty states ──────────────────────────────────────────────────────────── */
+
+.inv-type-list-no-data {
+  text-align: center;
+  padding: 40px;
+  color: #8c8c8c;
+}
+
+.inv-type-list-no-search {
+  text-align: center;
+  padding: 60px 20px;
+  color: #8c8c8c;
+  border-radius: 8px;
+  margin: 20px 10px;
+}
+
+.inv-type-list-no-search-icon {
+  font-size: 48px;
+  color: #d9d9d9;
+  margin-bottom: 16px;
+}
+
+.inv-type-list-no-search-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.inv-type-list-no-search-text {
+  font-size: 14px;
+}
+
+/* ── Float button ──────────────────────────────────────────────────────────── */
+
+.inv-type-list-float-button {
+  right: 24px;
+  bottom: 24px;
+  position: fixed;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Notification overrides (same as InvestmentList) ──────────────────────── */
+
+.ant-notification-notice-success {
+  background-color: #e6fffb !important;
+}
+
+.ant-notification-notice-error {
+  background: #fff1f0 !important;
+}
+
+.ant-notification-notice-warning {
+  background: #fffbe6 !important;
+}
+
+.ant-image-mask-info {
+  display: none !important;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .inv-type-list-scrollable-div {
+    height: calc(100vh - 250px);
+    padding: 0;
+    margin: 0;
+  }
+
+  .inv-type-list-badge {
+    margin-right: 10px;
+  }
+
+  .inv-type-list-line-header {
+    padding: 10px 0;
+  }
+}

@@ -1,0 +1,266 @@
+/* ======================
+   Page Layout Styles
+   ====================== */
+
+.loan-form-page-content {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.loan-form-container-fluid {
+  width: 100%;
+  margin: 0;
+  padding: 0 16px;
+}
+
+/* Header Styles - STICKY */
+.loan-form-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  background-color: #fff !important;
+  padding: 16px 0 !important;
+  margin: -16px 0 16px 0 !important;
+  /* border-bottom: 1px solid #f0f0f0 !important; */
+}
+
+/* ======================
+   Form Container Styles
+   ====================== */
+
+.loan-form-wrapper {
+  background-color: white;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loan-disbursement-form {
+  background-color: white;
+  border-radius: 0 0 8px 8px;
+}
+
+.loan-form-container {
+  padding: 32px 24px;
+}
+
+/* ======================
+   Form Field Spacing
+   ====================== */
+
+.mb-2 {
+  margin-bottom: 0;
+}
+
+.row.mb-2 + .row.mb-2 {
+  margin-top: 8px;
+}
+
+/* ======================
+   Custom Input Styles
+   ====================== */
+
+.loan-disbursement-form .ant-input,
+.loan-disbursement-form .ant-input-number,
+.loan-disbursement-form .ant-select-selector,
+.loan-disbursement-form .ant-input-textarea,
+.loan-disbursement-form .ant-picker {
+  border-radius: 6px;
+}
+
+.loan-disbursement-form .ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
+}
+
+.loan-disbursement-form .ant-input:focus,
+.loan-disbursement-form .ant-input-number:focus,
+.loan-disbursement-form .ant-select-focused .ant-select-selector,
+.loan-disbursement-form .ant-picker-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* ======================
+   Divider Styling
+   ====================== */
+
+.loan-form-divider {
+  margin: 32px 0;
+  border-top: 1px solid #d9d9d9;
+}
+
+/* ======================
+   Button Styles
+   ====================== */
+
+.loan-disbursement-form .ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.loan-disbursement-form .ant-btn-primary {
+  height: 40px;
+  padding: 0 32px;
+}
+
+.loan-disbursement-form .ant-btn-default {
+  height: 40px;
+  padding: 0 32px;
+}
+
+.loan-disbursement-form .ant-btn-dangerous {
+  height: 40px;
+  padding: 0 32px;
+}
+
+/* ======================
+   Responsive Design
+   ====================== */
+
+@media (max-width: 768px) {
+  .loan-form-header {
+    padding: 12px 0 !important;
+  }
+
+  .loan-form-container-fluid {
+    padding: 0 12px;
+  }
+
+  .loan-form-title {
+    /* font-size: 20px; */
+  }
+
+  .loan-form-container {
+    padding: 16px;
+  }
+}
+
+/* ======================
+   Animation
+   ====================== */
+
+.loan-disbursement-form {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ======================
+   Input Number Styles
+   ====================== */
+
+.loan-disbursement-form .ant-input-number {
+  width: 100%;
+}
+
+.loan-disbursement-form .ant-input-number-input {
+  height: 38px;
+}
+
+/* ======================
+   DatePicker Styles
+   ====================== */
+
+.loan-disbursement-form .ant-picker {
+  width: 100%;
+  height: 40px;
+}
+
+/* ======================
+   Select Styles
+   ====================== */
+
+.loan-disbursement-form .ant-select {
+  width: 100%;
+}
+
+.loan-disbursement-form .ant-select-selector {
+  height: 40px !important;
+  display: flex;
+  align-items: center;
+}
+
+/* ======================
+   TextArea Styles
+   ====================== */
+
+.loan-disbursement-form .ant-input-textarea {
+  border-radius: 6px;
+}
+
+/* ======================
+   Disabled Input Styles
+   ====================== */
+
+.loan-disbursement-form .ant-input-number-disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* ======================
+   Font Size Responsive Styles
+   ====================== */
+
+/* Default/Medium Size */
+.loan-form-title {
+  /* font-size: 24px; */
+  font-weight: 600;
+  margin: 0;
+}
+
+.loan-disbursement-form .ant-form-item-label > label,
+.loan-disbursement-form .ant-input,
+.loan-disbursement-form .ant-input-number,
+.loan-disbursement-form .ant-select-selector,
+.loan-disbursement-form .ant-input-textarea {
+  font-size: 16px;
+}
+
+/* Large Size - Apply 'font-size-large' class */
+.font-size-large .loan-form-title {
+  /* font-size: 26px; */
+}
+
+.font-size-large .loan-disbursement-form .ant-form-item-label > label,
+.font-size-large .loan-disbursement-form .ant-input,
+.font-size-large .loan-disbursement-form .ant-input-number,
+.font-size-large .loan-disbursement-form .ant-select-selector,
+.font-size-large .loan-disbursement-form .ant-input-textarea {
+  font-size: 18px;
+}
+
+/* Extra Large Size - Apply 'font-size-xlarge' class */
+.font-size-xlarge .loan-form-title {
+  /* font-size: 28px; */
+}
+
+.font-size-xlarge .loan-disbursement-form .ant-form-item-label > label,
+.font-size-xlarge .loan-disbursement-form .ant-input,
+.font-size-xlarge .loan-disbursement-form .ant-input-number,
+.font-size-xlarge .loan-disbursement-form .ant-select-selector,
+.font-size-xlarge .loan-disbursement-form .ant-input-textarea {
+  font-size: 20px;
+}
+
+/* Sticky Header Position */
+.add-customer-title,
+.add-area-title,
+.add-branch-title,
+.expense-transaction-title,
+.add-investment-title,
+.add-line-title,
+.loan-form-title {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+

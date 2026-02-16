@@ -1,0 +1,478 @@
+/* Loan Disbursement Component Styles - Based on ViewArea Design */
+
+.loan-page-content {
+  padding: 0 !important;
+  margin: 0px 0px;
+}
+
+/* Header Styles - STICKY */
+.loan-disbursement-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  background-color: #fff !important;
+  padding: 16px 0 !important;
+  margin: -16px 0 16px 0 !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+.loan-disbursement-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0;
+  margin-left: 0;
+  padding: 0px;
+}
+
+.loan-disbursement-title {
+  font-size: 24px !important;
+  font-weight: 600;
+  margin: 0;
+}
+
+.loan-disbursement-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Action buttons responsive sizing */
+.loan-action-btn {
+  flex-shrink: 0;
+}
+
+/* Green Add Button */
+.loan-add-button {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+}
+
+.loan-add-button:hover {
+  background-color: #218838 !important;
+  border-color: #1e7e34 !important;
+}
+
+.loan-add-button:focus {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+}
+
+/* Accordion/Card Styles */
+.loan-accordion-card {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* White background for Collapse Header */
+.loan-accordion-card .ant-collapse-header {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.loan-accordion-card .ant-collapse-expand-icon {
+  color: #000000 !important;
+}
+
+.loan-accordion-card .ant-collapse-content {
+  border-top: none !important;
+}
+.ant-typography.ant-typography-secondary{
+  color : black;
+}
+
+/* Summary Grid Styles - With proper spacing */
+.summary-stat-box {
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.summary-stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Summary label and value default sizes (14px, 18px) */
+.summary-label {
+  font-size: 14px !important;
+  display: block;
+}
+
+.summary-value {
+  font-size: 18px !important;
+  display: block;
+}
+
+/* Tabs Container with padding */
+.loan-tabs-card {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.loan-tabs-card .ant-tabs-nav {
+  padding-left: 8px;
+}
+
+/* Customer List Styles - Similar to ViewArea */
+.loan-scrollable-div {
+  height: calc(100vh - 320px);
+  width: auto;
+  overflow: auto;
+  margin-top: 20px;
+}
+
+.loan-scrollable-div::-webkit-scrollbar {
+  width: 6px;
+}
+
+.loan-scrollable-div::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.loan-scrollable-div::-webkit-scrollbar-thumb {
+  background: #bfbfbf;
+  border-radius: 3px;
+}
+
+.loan-scrollable-div::-webkit-scrollbar-thumb:hover {
+  background: #8c8c8c;
+}
+
+/* Customer List Item Styles */
+.loan-customer-list-item-wrapper,
+.loan-mobile-item-wrapper {
+  border-bottom: 2px solid #f0f0f0;
+  padding: 0 !important;
+  background: #fff;
+}
+
+.loan-customer-list-item {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  cursor: pointer;
+  padding: 12px 20px;
+  transition: all 0.2s;
+}
+
+.loan-customer-list-item:hover {
+  background: #f9f9f9;
+}
+
+/* Avatar/Index Badge */
+.loan-customer-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 4px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background-color: #fff !important;
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+  font-size: 20px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.2s;
+}
+
+/* Customer Title Container */
+.loan-customer-title-container {
+  margin-left: 8px;
+  margin-right: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.loan-customer-name {
+  font-weight: 600;
+  color: black;
+  font-size: 20px;
+}
+
+.loan-customer-id {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* Customer Actions */
+.loan-customer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.loan-ellipsis-icon {
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  margin-right: 24px;
+}
+
+.loan-ellipsis-icon:hover {
+  color: #1890ff;
+}
+
+/* Divider Styles */
+.loan-divider-container {
+  margin: 16px 0;
+}
+
+.loan-divider-star {
+  color: red;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.loan-divider-text {
+  color: #595959;
+  font-size: 14px;
+}
+
+/* Skeleton Loader */
+.loan-skeleton-container {
+  text-align: center;
+  padding: 16px;
+}
+
+/* No Data Message */
+.loan-no-data {
+  text-align: center;
+  padding: 40px;
+  color: #8c8c8c;
+}
+
+/* Search Modal Styles */
+.loan-search-modal-title {
+  text-align: center;
+  width: 100%;
+}
+
+.loan-search-modal-label {
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.loan-search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  outline: none;
+}
+
+/* Ant Design List Item Meta Fix */
+.ant-list-item-meta {
+  padding: 0px !important;
+}
+
+.ant-list .ant-list-item .ant-list-item-meta .ant-list-item-meta-avatar {
+  margin-inline-end: 0;
+}
+
+.ant-image-mask-info {
+  display: none !important;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .loan-disbursement-header {
+    padding: 12px 0 !important;
+  }
+
+  .loan-disbursement-header-container {
+    padding: 0px;
+    flex-wrap: nowrap;
+  }
+
+  .loan-disbursement-title {
+    
+    white-space: nowrap;
+    margin-right: 8px;
+  }
+
+  .loan-disbursement-actions {
+    gap: 6px;
+  }
+
+  .loan-action-btn {
+    min-width: 32px !important;
+    padding: 4px 8px !important;
+  }
+
+  .loan-customer-list-item {
+    padding: 10px 12px;
+  }
+
+  .loan-customer-index-badge {
+    min-width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .loan-customer-name {
+    font-size: 18px;
+  }
+
+  .loan-customer-id {
+    font-size: 11px;
+  }
+
+  .loan-scrollable-div {
+    height: calc(100vh - 280px);
+  }
+
+  .summary-stat-box {
+    padding: 10px 6px;
+  }
+
+  .summary-label {
+    /* font-size: 12px !important; */
+  }
+
+  .summary-value {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .loan-page-content {
+    padding: 0 !important;
+  }
+
+  .loan-disbursement-title {
+    /* font-size: 18px; */
+  }
+
+  .loan-customer-name {
+    font-size: 16px;
+  }
+}
+
+/* ============================================
+   FONT SIZE VARIATIONS - MATCHING AREA MODULE
+   ============================================ */
+
+/* LARGE SIZE (16px label, 20px value) */
+.font-size-large .loan-disbursement-title {
+  font-size: 26px !important;
+}
+
+.font-size-large .loan-customer-name {
+  font-size: 22px !important;
+}
+
+.font-size-large .loan-customer-index-badge {
+  font-size: 22px !important;
+}
+
+.font-size-large .loan-customer-id {
+  font-size: 13px !important;
+}
+
+.font-size-large .loan-divider-text {
+  font-size: 15px !important;
+}
+
+.font-size-large .loan-search-modal-title {
+  font-size: 19px !important;
+}
+
+.font-size-large .summary-label {
+  font-size: 16px !important;
+}
+
+.font-size-large .summary-value {
+  font-size: 20px !important;
+}
+
+/* EXTRA LARGE SIZE (18px label, 22px value) */
+.font-size-xlarge .loan-disbursement-title {
+  font-size: 28px !important;
+}
+
+.font-size-xlarge .loan-customer-name {
+  font-size: 24px !important;
+}
+
+.font-size-xlarge .loan-customer-index-badge {
+  font-size: 24px !important;
+}
+
+.font-size-xlarge .loan-customer-id {
+  font-size: 14px !important;
+}
+
+.font-size-xlarge .loan-divider-text {
+  font-size: 16px !important;
+}
+
+.font-size-xlarge .loan-search-modal-title {
+  font-size: 20px !important;
+}
+
+.font-size-xlarge .summary-label {
+  font-size: 18px !important;
+}
+
+.font-size-xlarge .summary-value {
+  font-size: 22px !important;
+}
+
+/* SwipeablePanel Mobile List Font Sizes */
+.font-size-large .custom-padding h5 {
+  font-size: 22px !important;
+}
+
+.font-size-large .custom-padding > div > div:first-child {
+  font-size: 22px !important;
+}
+
+.font-size-xlarge .custom-padding h5 {
+  font-size: 24px !important;
+}
+
+.font-size-xlarge .custom-padding > div > div:first-child {
+  font-size: 24px !important;
+}
+
+/* Tabs sticky behavior when customer expanded */
+.loan-tabs-card.customer-expanded {
+  position: sticky !important;
+  top: 130px !important;
+  z-index: 97 !important;
+}
+
+/* Ensure tabs are always visible */
+.loan-tabs-card {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Smooth transition for all sticky elements */
+.loan-accordion-card,
+.loan-tabs-card {
+  transition: top 0.3s ease, z-index 0.3s ease !important;
+}
+/* In DisburseLoanList.css */
+.loan-customer-list-item-wrapper,
+.loan-mobile-item-wrapper {
+  scroll-margin-top: 210px; /* header(72px) + collapsed accordion(130px) + padding(10px) */
+}
+
+/* Adjust for when accordion is open */
+.accordion-open .loan-customer-list-item-wrapper,
+.accordion-open .loan-mobile-item-wrapper {
+  scroll-margin-top: 300px; /* Adjust based on open accordion height */
+}

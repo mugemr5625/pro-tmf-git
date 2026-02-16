@@ -1,0 +1,34 @@
+/* AddInvestmentType Component Styles */
+
+.add-inv-type-page-content {
+  margin-right: 10px;
+  margin-left: -10px;
+  max-width: 100%;
+}
+
+.add-inv-type-container-fluid {
+  padding: 0;
+}
+
+.add-inv-type-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.add-inv-type-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.add-inv-type-form {
+  padding: 0;
+  margin-right: -20px;
+  margin-bottom: 30px;
+}
+
+.add-inv-type-form-container {
+  padding: 5px;
+}
