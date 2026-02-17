@@ -2,7 +2,7 @@
    User-Selectable Font Sizes
    ====================== */
 
-   * Default/Medium Size */
+   /* Default/Medium Size */
 .loan-form-title {
   font-size: 24px !important;
   font-weight: 600;
@@ -1174,58 +1174,6 @@ button,
   color: #1f1f1f;
 }
 
-/* ==========================================
-   DEBUG HELPER (Remove in production)
-   ========================================== */
-
-/* Uncomment to visualize sticky elements during development
-.add-area-header,
-.add-line-header,
-.add-investment-header,
-.expense-transaction-header,
-.add-customer-header,
-.add-user-header {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-*/
-/* ======================
-   Usage Instructions
-   ====================== 
-   
-   Apply one of these classes to your root container or Layout wrapper:
-   - No class = Medium (default): 
-     * Titles: 24px, Content: 16px
-     * Main menu icons: 19px, text: 15px
-     * Submenu icons: 18px, text: 14px
-     * Header icons (notification, profile, toggle): 20px
-     * Dropdown content: 14px
-     * Sidebar width: 250px
-   
-   - 'font-size-large' = Large: 
-     * Titles: 26px, Content: 18px
-     * Main menu icons: 21px, text: 16px
-     * Submenu icons: 20px, text: 15px
-     * Header icons (notification, profile, toggle): 22px
-     * Dropdown content: 16px
-     * Sidebar width: 270px
-   
-   - 'font-size-xlarge' = Extra Large: 
-     * Titles: 28px, Content: 20px
-     * Main menu icons: 23px, text: 17px
-     * Submenu icons: 22px, text: 16px
-     * Header icons (notification, profile, toggle): 24px
-     * Dropdown content: 18px
-     * Sidebar width: 290px
-   
-   Example in React:
-   <Layout className={fontSize}>
-     <VerticalLayout>
-       Your components
-     </VerticalLayout>
-   </Layout>
-   
-   Where fontSize state can be: '', 'font-size-large', or 'font-size-xlarge'
-*/
 
 
 /* Main layout - allow overflow */

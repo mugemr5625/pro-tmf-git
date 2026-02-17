@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/static/css/main.916efb9e.css",
-    "main.js": "/static/js/main.64aaa503.js",
+    "main.css": "/static/css/main.c9b725a1.css",
+    "main.js": "/static/js/main.3a6c4c38.js",
     "static/media/materialdesignicons-webfont.eot": "/static/media/materialdesignicons-webfont.52adde0de9840940801f.eot",
     "static/media/materialdesignicons-webfont.ttf?v=5.8.55": "/static/media/materialdesignicons-webfont.506bc8215df8660d8f04.ttf",
     "static/media/fa-solid-900.svg": "/static/media/fa-solid-900.3a909e9bcf105f28ebe7.svg",
@@ -61,11 +61,12 @@
     "static/media/word.png": "/static/media/word.3520590ca5c0502f023d.png",
     "static/media/profits (1).png": "/static/media/profits (1).550ee7b284ffa8f6019b.png",
     "index.html": "/index.html",
-    "main.916efb9e.css.map": "/static/css/main.916efb9e.css.map",
-    "main.64aaa503.js.map": "/static/js/main.64aaa503.js.map"
+    "static/media/grain.svg": "/static/media/grain.86936f1ab94cea2a0cad.svg",
+    "main.c9b725a1.css.map": "/static/css/main.c9b725a1.css.map",
+    "main.3a6c4c38.js.map": "/static/js/main.3a6c4c38.js.map"
   },
   "entrypoints": [
-    "static/css/main.916efb9e.css",
-    "static/js/main.64aaa503.js"
+    "static/css/main.c9b725a1.css",
+    "static/js/main.3a6c4c38.js"
   ]
 }
