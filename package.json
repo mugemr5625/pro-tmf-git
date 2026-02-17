@@ -72,7 +72,7 @@
   },
   "scripts": {
     "start": "set GENERATE_SOURCEMAP=false  && set DISABLE_CSS_MINIMIZER=true && react-scripts start",
-    "build": "set GENERATE_SOURCEMAP=false && react-scripts build",
+    "build": "set GENERATE_SOURCEMAP=false  && set DISABLE_CSS_MINIMIZER=true && react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,scss,json,md}\"",
