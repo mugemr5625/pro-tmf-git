@@ -1220,7 +1220,7 @@ button,
    Example in React:
    <Layout className={fontSize}>
      <VerticalLayout>
-       // Your components
+       Your components
      </VerticalLayout>
    </Layout>
    
