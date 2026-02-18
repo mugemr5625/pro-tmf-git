@@ -7,7 +7,9 @@
   overflow: hidden;
   min-height: 500px;
 }
-
+.tabs-scrolled .ant-tabs-nav {
+    display: none !important;
+}
 .form-slide {
   width: 100%;
   animation-duration: 0.5s;

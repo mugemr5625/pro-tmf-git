@@ -26,6 +26,7 @@ const SelectWithAddon = ({ icon, children, size = "middle",disabled, ...rest }) 
       overflow: 'hidden',
       height: height,
       backgroundColor: disabled ? '#f5f5f5f':'white' ,
+      
     }}>
       <div style={{
         display: 'flex',

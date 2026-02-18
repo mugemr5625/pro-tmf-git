@@ -28,6 +28,8 @@ const ListBranch = () => {
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasBranchSelected, setHasBranchSelected] = useState(false);
+  const [branchDocuments, setBranchDocuments] = useState([]);
+const [documentsLoading, setDocumentsLoading] = useState(false);
 
   useEffect(() => {
     const savedBranch = localStorage.getItem("selected_branch_name");
@@ -140,13 +142,38 @@ const ListBranch = () => {
       setLoading(false);
     }
   }, [selectedBranchId]);
+  const fetchBranchDocuments = useCallback(async () => {
+  if (!selectedBranchId) return;
 
-  useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token && hasBranchSelected && selectedBranchId) {
-      fetchBranchDetails();
+  setDocumentsLoading(true);
+  try {
+    const response = await GET(`/api/branch-documents/?branch_id=${selectedBranchId}`);
+    if (response?.status === 200) {
+      setBranchDocuments(response.data?.results || []);
+    } else {
+      notification.error({
+        message: "Error",
+        description: "Failed to load branch documents.",
+      });
     }
-  }, [fetchBranchDetails, hasBranchSelected, selectedBranchId]);
+  } catch (error) {
+    console.error("Error fetching branch documents:", error);
+    notification.error({
+      message: "Error",
+      description: "Failed to load branch documents.",
+    });
+  } finally {
+    setDocumentsLoading(false);
+  }
+}, [selectedBranchId]);
+
+ useEffect(() => {
+  const token = localStorage.getItem("access_token");
+  if (token && hasBranchSelected && selectedBranchId) {
+    fetchBranchDetails();
+    fetchBranchDocuments();  // <-- add this
+  }
+}, [fetchBranchDetails, fetchBranchDocuments, hasBranchSelected, selectedBranchId]);
 
   const handleSwipeStateChange = (isOpen) => {
     if (isOpen) {
@@ -262,6 +289,8 @@ const ListBranch = () => {
                   <BranchCollapseContent 
                     branch={branchDetails} 
                     details={branchDetails} 
+                     documents={branchDocuments}          // <-- add
+  documentsLoading={documentsLoading}  // <-- add
                   />
                 </div>
               </div>
@@ -286,6 +315,8 @@ const ListBranch = () => {
                   <BranchCollapseContent 
                     branch={branchDetails} 
                     details={branchDetails} 
+                     documents={branchDocuments}          // <-- add
+  documentsLoading={documentsLoading}  // <-- add
                   />
                 </div>
               </div>

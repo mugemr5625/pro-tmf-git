@@ -1,4 +1,4 @@
-import { Button, Form, Select, Switch, notification, Space } from "antd";
+import { Button, Form, Select, Switch, notification, Space, Spin } from "antd";
 import Loader from "components/Common/Loader";
 import { POST, PUT, GET } from "helpers/api_helper";
 import { Fragment, useEffect, useState } from "react";
@@ -30,6 +30,8 @@ const AddInvestmentType = () => {
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [selectedBranchName, setSelectedBranchName] = useState("");
   const [multiUserAllocation, setMultiUserAllocation] = useState(false);
+  const [userLoading, setUserLoading] = useState(false);
+  
 
   // ── On mount ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -96,19 +98,22 @@ const AddInvestmentType = () => {
 
   // ── API helpers ───────────────────────────────────────────────────────────
 
-  const fetchUsers = async () => {
-    try {
-      const res = await GET("/api/users/");
-      if (res?.status === 200) {
-        const data = Array.isArray(res.data)
-          ? res.data
-          : res.data?.results || [];
-        setUserList(data);
-      }
-    } catch {
-      setUserList([]);
+ const fetchUsers = async () => {
+  try {
+    setUserLoading(true);
+    const res = await GET("/api/users/");
+    if (res?.status === 200) {
+      const data = Array.isArray(res.data)
+        ? res.data
+        : res.data?.results || [];
+      setUserList(data);
     }
-  };
+  } catch {
+    setUserList([]);
+  } finally {
+    setUserLoading(false);
+  }
+};
 
   const fetchLines = async (branchId) => {
     try {
@@ -256,29 +261,29 @@ const AddInvestmentType = () => {
                   {/* Row 2 – Line & Multi-User */}
                   <div className="row mb-2">
                     <div className="col-md-6">
-                      <Form.Item
-                        label="Line Name"
-                        name="line"
-                        rules={[{ required: true, message: "Please select a line" }]}
-                      >
-                        <SelectWithAddon
-                          icon={<ApartmentOutlined />}
-                          placeholder={lineLoading ? "Loading lines…" : "Select Line"}
-                          allowClear
-                          showSearch
-                          size="large"
-                          loading={lineLoading}
-                          filterOption={(input, option) =>
-                            option.children.toLowerCase().includes(input.toLowerCase())
-                          }
-                        >
-                          {lineList.map((line) => (
-                            <Option key={line.line_id} value={line.line_id}>
-                              {line.line_name}
-                            </Option>
-                          ))}
-                        </SelectWithAddon>
-                      </Form.Item>
+                     <Form.Item
+  label="Line Name"
+  name="line"
+  rules={[{ required: true, message: "Please select a line" }]}
+>
+  <SelectWithAddon
+    icon={lineLoading ? <Spin size="small" /> : <ApartmentOutlined />}
+    placeholder={lineLoading ? "Loading lines…" : "Select Line"}
+    allowClear
+    showSearch
+    size="large"
+    disabled={lineLoading}
+    filterOption={(input, option) =>
+      option.children.toLowerCase().includes(input.toLowerCase())
+    }
+  >
+    {lineList.map((line) => (
+      <Option key={line.line_id} value={line.line_id}>
+        {line.line_name}
+      </Option>
+    ))}
+  </SelectWithAddon>
+</Form.Item>
                     </div>
 
                     <div className="col-md-6">
@@ -306,26 +311,27 @@ const AddInvestmentType = () => {
                     <div className="row mb-2">
                       <div className="col-md-6">
                         <Form.Item
-                          label="Entitled To"
-                          name="entitled_to"
-                        >
-                          <SelectWithAddon
-                            icon={<UserOutlined />}
-                            placeholder="Select User"
-                            allowClear
-                            showSearch
-                            size="large"
-                            filterOption={(input, option) =>
-                              option.children.toLowerCase().includes(input.toLowerCase())
-                            }
-                          >
-                            {userList.map((user) => (
-                              <Option key={user.id} value={user.id}>
-                                {user.full_name ? `${user.full_name} | ${user.username}` : user.username}
-                              </Option>
-                            ))}
-                          </SelectWithAddon>
-                        </Form.Item>
+  label="Entitled To"
+  name="entitled_to"
+>
+  <SelectWithAddon
+    icon={userLoading ? <Spin size="small" /> : <UserOutlined />}
+    placeholder={userLoading ? "Loading users…" : "Select User"}
+    allowClear
+    showSearch
+    size="large"
+    disabled={userLoading}
+    filterOption={(input, option) =>
+      option.children.toLowerCase().includes(input.toLowerCase())
+    }
+  >
+    {userList.map((user) => (
+      <Option key={user.id} value={user.id}>
+        {user.full_name ? `${user.full_name} | ${user.username}` : user.username}
+      </Option>
+    ))}
+  </SelectWithAddon>
+</Form.Item>
                       </div>
                     </div>
                   )}

@@ -211,10 +211,10 @@ const InvestmentList = () => {
     setSearchCriteria(null);
     setHasSearched(false);
 
-    notification.success({
-      message: "Data Reset",
-      description: "Please perform a new search to view investments.",
-    });
+    // notification.success({
+    //   message: "Data Reset",
+    //   description: "Please perform a new search to view investments.",
+    // });
 
     setTimeout(() => {
       setSearchModalVisible(true);
@@ -491,61 +491,74 @@ const InvestmentList = () => {
       <div>
   <p className="investment-list-modal-label">Select Line:</p>
   <Select
-  mode="multiple"
-  value={selectedLines}
-  onChange={handleLineSelection}
-  style={{ width: "100%" }}
-  placeholder="Select line"
-  allowClear
-  maxTagCount={1}
-  maxTagTextLength={10}
-  maxTagPlaceholder={(omittedValues) => (
-  <Tooltip
-    open={lineTooltipOpen}
-    onOpenChange={(open) => setLineTooltipOpen(open)}
-    title={
-       <div onMouseDown={(e) => e.stopPropagation()}> 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <span style={{ fontWeight: 'bold' }}>Selected Lines ({omittedValues.length + 1}):</span>
-          <span
-           onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setLineTooltipOpen(false); }}
-            style={{ cursor: 'pointer', marginLeft: '8px', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
-          >✕</span>
-        </div>
-        {selectedLines
-          .filter(v => v !== ALL_LINES_VALUE)
-          .map((line, idx) => (
-            <div key={idx}>• {line}</div>
-          ))}
-      </div>
-    }
-    placement="bottom"
-    trigger="click"
-  >
-    <span
-      onClick={(e) => { e.stopPropagation(); setLineTooltipOpen(!lineTooltipOpen); }}
-      style={{ cursor: 'pointer', color: '#1890ff' }}
-    >
-      +{omittedValues.length} more
-    </span>
-  </Tooltip>
-)}
-  loading={lineLoader}
-  open={lineDropdownOpen}
-  onDropdownVisibleChange={(open) => setLineDropdownOpen(open)}
-  dropdownRender={(menu) => (
-    <>
-      {menu}
-      <div style={{ padding: '4px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'center' }}>
-        <Button style={{background: "#28a544", color: "white"}} size="small" onClick={() => setLineDropdownOpen(false)}>
-          Select Done ✓
-        </Button>
-      </div>
-    </>
-  )}
->
-  </Select>
+            mode="multiple"
+            value={selectedLines}
+            onChange={handleLineSelection}
+            style={{ width: "100%" }}
+            placeholder="Select line"
+            allowClear
+            maxTagCount={1}
+            maxTagTextLength={10}
+            maxTagPlaceholder={(omittedValues) => (
+              <Tooltip
+                open={lineTooltipOpen}
+                onOpenChange={(open) => setLineTooltipOpen(open)}
+                title={
+                  <div onMouseDown={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 'bold' }}>Selected Lines ({omittedValues.length + 1}):</span>
+                      <span
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setLineTooltipOpen(false); }}
+                        style={{ cursor: 'pointer', marginLeft: '8px', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
+                      >✕</span>
+                    </div>
+                    {selectedLines
+                      .filter(v => v !== ALL_LINES_VALUE)
+                      .map((line, idx) => (
+                        <div key={idx}>• {line}</div>
+                      ))}
+                  </div>
+                }
+                placement="bottom"
+                trigger="click"
+              >
+                <span
+                  onClick={(e) => { e.stopPropagation(); setLineTooltipOpen(!lineTooltipOpen); }}
+                  style={{ cursor: 'pointer', color: '#1890ff' }}
+                >
+                  +{omittedValues.length} more
+                </span>
+              </Tooltip>
+            )}
+            loading={lineLoader}
+            open={lineDropdownOpen}
+            onDropdownVisibleChange={(open) => setLineDropdownOpen(open)}
+            dropdownRender={(menu) => (
+              <>
+                {menu}
+                <div style={{ padding: '4px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'center' }}>
+                  <Button
+                    style={{ background: "#28a544", color: "white" }}
+                    size="small"
+                    onClick={() => setLineDropdownOpen(false)}
+                  >
+                    Select Done ✓
+                  </Button>
+                </div>
+              </>
+            )}
+          >
+            {/* "All Lines" option */}
+            <Option value={ALL_LINES_VALUE}>All Lines</Option>
+
+            {/* Individual line options from getUniqueLines() */}
+            {getUniqueLines().map((lineName) => (
+              <Option key={lineName} value={lineName}>
+                {lineName}
+              </Option>
+            ))}
+          </Select>
 </div>
 
         <div>

@@ -379,10 +379,10 @@ const getExpenseTypesList = async () => {
     setSearchCriteria(null);
     setHasSearched(false);
 
-    notification.success({
-      message: "Data Reset",
-      description: "Please perform a new search to view expense transactions.",
-    });
+    // notification.success({
+    //   message: "Data Reset",
+    //   description: "Please perform a new search to view expense transactions.",
+    // });
 
     setTimeout(() => {
       setSearchModalVisible(true);

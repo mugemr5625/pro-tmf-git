@@ -64,7 +64,6 @@ const AddArea = () => {
       const response = await GET("api/branch_dd");
       
       if (response?.status === 200 && response?.data) {
-        // Find the branch that matches the selected_branch_id
         const matchedBranch = response.data.find(
           branch => branch.id === parseInt(selectedBranchId)
         );
@@ -97,33 +96,32 @@ const AddArea = () => {
   };
 
   const getAreaDetails = useCallback(async () => {
-  try {
-    setLoader(true);
-    const response = await GET(`${AREA}${params.id}`);
-    if (response?.status === 200) {
-      const areaData = response.data;
-      
-      // Set the line name from response
-      setSelectedLineName(areaData.line_name || "");
-      
-      const updatedData = {
-        ...areaData,
-        line_id: areaData.line, // Use 'line' from response (540)
-        branch_id: areaData.branch, // Use 'branch' from response (57)
-      };
-      
-      setFormData(updatedData);
-      form.setFieldsValue(updatedData);
-    } else {
+    try {
+      setLoader(true);
+      const response = await GET(`${AREA}${params.id}`);
+      if (response?.status === 200) {
+        const areaData = response.data;
+        
+        setSelectedLineName(areaData.line_name || "");
+        
+        const updatedData = {
+          ...areaData,
+          line_id: areaData.line,
+          branch_id: areaData.branch,
+        };
+        
+        setFormData(updatedData);
+        form.setFieldsValue(updatedData);
+      } else {
+        setFormData([]);
+      }
+      setLoader(false);
+    } catch (error) {
       setFormData([]);
+      setLoader(false);
+      console.log(error);
     }
-    setLoader(false);
-  } catch (error) {
-    setFormData([]);
-    setLoader(false);
-    console.log(error);
-  }
-}, [params.id, form]);
+  }, [params.id, form]);
 
   const getLineList = async (branchId = null) => {
     try {
@@ -131,7 +129,6 @@ const AddArea = () => {
       const response = await GET("api/line_dd");
       
       if (response?.status === 200) {
-        // Filter lines by branch if branchId is provided
         if (branchId) {
           const filteredLines = response?.data?.filter(
             (line) => line?.branch_id === branchId
@@ -150,16 +147,14 @@ const AddArea = () => {
     }
   };
 
-   const onFinish = async () => {
+  const onFinish = async () => {
     setLoader(true);
     try {
       let response;
       
       if (params.id) {
-        // Edit mode - use PUT API
         response = await PUT(`${AREA}${params.id}/`, formData);
       } else {
-        // Create mode - use POST API
         response = await POST(AREA, formData);
       }
 
@@ -208,19 +203,25 @@ const AddArea = () => {
       setLoader(false);
     }
   };
+
   const onValuesChange = (changedValues, allValues) => {
     if (changedValues?.branch_id) {
-      // Clear line selection when branch changes
       setFormData({ ...formData, ...allValues, line_id: "" });
-      form.setFieldsValue({
-        line_id: "",
-      });
-      // Fetch lines for the new branch
+      form.setFieldsValue({ line_id: "" });
       getLineList(allValues.branch_id);
       return;
     }
     setFormData({ ...formData, ...allValues });
   };
+
+  // ── Derived state for line field ──────────────────────────────────────────
+  // Branch not yet loaded → disable and show spinner
+  // Branch loaded, lines loading → disable and show spinner
+  // Branch loaded, lines ready → enable and show ApartmentOutlined
+  const isLineDisabled = branchLoader || !formData?.branch_id || lineLoader;
+  const lineFieldIcon = (branchLoader || lineLoader)
+    ? <Spin size="small" />
+    : <ApartmentOutlined />;
 
   return (
     <>
@@ -247,6 +248,8 @@ const AddArea = () => {
                 <div className="container add-area-form-container">
                   {/* Branch and Line */}
                   <div className="row mb-2">
+
+                    {/* ── Branch field ── */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Branch"
@@ -257,135 +260,115 @@ const AddArea = () => {
                           },
                         ]}
                       >
-                        {branchLoader ? (
-                          <InputWithAddon
-                            icon={<Spin size="small" />}
-                            value="Loading..."
-                            disabled
-                            style={{ 
-                              backgroundColor: '#f5f5f5',
-                              cursor: 'not-allowed',
-                              color: '#999'
-                            }}
-                          />
-                        ) : (
-                          <InputWithAddon
-                            icon={<BankOutlined />}
-                            value={selectedBranchName || "No branch selected"}
-                            placeholder="No branch selected"
-                            disabled
-                            style={{ 
-                              backgroundColor: '#f5f5f5',
-                              cursor: 'not-allowed',
-                              color: '#000'
-                            }}
-                          />
-                        )}
+                        <InputWithAddon
+                          icon={branchLoader ? <Spin size="small" /> : <BankOutlined />}
+                          value={branchLoader ? "Loading..." : (selectedBranchName || "No branch selected")}
+                          placeholder="No branch selected"
+                          disabled
+                          style={{
+                            backgroundColor: '#f5f5f5',
+                            cursor: 'not-allowed',
+                            color: branchLoader ? '#999' : '#000',
+                          }}
+                        />
                       </Form.Item>
                     </div>
 
-               <div className="col-md-6">
-  {params.id ? (
-    // In edit mode - show line name without form binding
-    <Form.Item
-      label="Line"
-      rules={[
-        {
-          required: true,
-          message: ERROR_MESSAGES.AREA.LINE_REQUIRED,
-        },
-      ]}
-    >
-      <InputWithAddon
-        icon={<ApartmentOutlined />}
-        value={selectedLineName || "Loading..."}
-        disabled
-        style={{ 
-          backgroundColor: '#f5f5f5',
-          cursor: 'not-allowed',
-          color: '#000'
-        }}
-      />
-    </Form.Item>
-  ) : (
-    // In create mode - show dropdown with form binding
-    <Form.Item
-      label="Line"
-      name="line_id"
-      rules={[
-        {
-          required: true,
-          message: ERROR_MESSAGES.AREA.LINE_REQUIRED,
-        },
-      ]}
-    >
-      <SelectWithAddon
-        icon={<ApartmentOutlined />}
-        placeholder="Select Line"
-        allowClear
-        showSearch
-        size="large"
-        loading={lineLoader}
-        disabled={!formData?.branch_id}
-        filterOption={(input, option) =>
-          option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-        }
-      >
-        {lineList?.map((line) => (
-          <Option key={line?.line_id} value={line?.line_id}>
-            {line?.line_name}
-          </Option>
-        ))}
-      </SelectWithAddon>
-    </Form.Item>
-  )}
-</div>
-</div>
+                    {/* ── Line field ── */}
+                    <div className="col-md-6">
+                      {params.id ? (
+                        // Edit mode — show line name as read-only text
+                        <Form.Item
+                          label="Line"
+                          rules={[{ required: true, message: ERROR_MESSAGES.AREA.LINE_REQUIRED }]}
+                        >
+                          <InputWithAddon
+                            icon={<ApartmentOutlined />}
+                            value={selectedLineName || "Loading..."}
+                            disabled
+                            style={{
+                              backgroundColor: '#f5f5f5',
+                              cursor: 'not-allowed',
+                              color: '#000',
+                            }}
+                          />
+                        </Form.Item>
+                      ) : (
+                        // Create mode — dropdown, disabled until branch is loaded
+                        // and shows spinner while branch or lines are loading
+                        <Form.Item
+                          label="Line"
+                          name="line_id"
+                          rules={[{ required: true, message: ERROR_MESSAGES.AREA.LINE_REQUIRED }]}
+                        >
+                          <SelectWithAddon
+                            icon={lineFieldIcon}
+                            placeholder={
+                              branchLoader
+                                ? "Loading branch..."
+                                : lineLoader
+                                ? "Loading lines..."
+                                : !formData?.branch_id
+                                ? "Select a branch first"
+                                : "Select Line"
+                            }
+                            allowClear
+                            showSearch
+                            size="large"
+                            loading={lineLoader}
+                            disabled={isLineDisabled}
+                            filterOption={(input, option) =>
+                              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                            }
+                          >
+                            {lineList?.map((line) => (
+                              <Option key={line?.line_id} value={line?.line_id}>
+                                {line?.line_name}
+                              </Option>
+                            ))}
+                          </SelectWithAddon>
+                        </Form.Item>
+                      )}
+                    </div>
+
+                  </div>
 
                   {/* Area Name */}
-                 <div className="row mb-2">
-  <div className="col-md-6">
-    <Form.Item
-      label="Area Name"
-      name="areaName"
-      rules={[
-        {
-          required: true,
-          message: 'Please enter area name',
-        },
-        { 
-          pattern: /^[A-Za-z][A-Za-z0-9\s-]*$/, 
-          message: 'Area name must start with an alphabet and can contain alphabets, numbers, spaces, and hyphens' 
-        }
-      ]}
-    >
-      <InputWithAddon
-        icon={<EnvironmentOutlined />}
-        placeholder="Enter area name"
-        onValueFilter={(value) => {
-          if (value.length === 0) return '';
-          
-          // First character must be alphabet
-          let filtered = '';
-          for (let i = 0; i < value.length; i++) {
-            if (i === 0) {
-              // First character: only alphabets
-              if (/[A-Za-z]/.test(value[i])) {
-                filtered += value[i];
-              }
-            } else {
-              // Subsequent characters: alphabets, numbers, spaces, and hyphens
-              if (/[A-Za-z0-9\s-]/.test(value[i])) {
-                filtered += value[i];
-              }
-            }
-          }
-          return filtered;
-        }}
-      />
-    </Form.Item>
-  </div>
-</div>
+                  <div className="row mb-2">
+                    <div className="col-md-6">
+                      <Form.Item
+                        label="Area Name"
+                        name="areaName"
+                        rules={[
+                          {
+                            required: true,
+                            message: 'Please enter area name',
+                          },
+                          { 
+                            pattern: /^[A-Za-z][A-Za-z0-9\s-]*$/, 
+                            message: 'Area name must start with an alphabet and can contain alphabets, numbers, spaces, and hyphens' 
+                          }
+                        ]}
+                      >
+                        <InputWithAddon
+                          icon={<EnvironmentOutlined />}
+                          placeholder="Enter area name"
+                          onValueFilter={(value) => {
+                            if (value.length === 0) return '';
+                            let filtered = '';
+                            for (let i = 0; i < value.length; i++) {
+                              if (i === 0) {
+                                if (/[A-Za-z]/.test(value[i])) filtered += value[i];
+                              } else {
+                                if (/[A-Za-z0-9\s-]/.test(value[i])) filtered += value[i];
+                              }
+                            }
+                            return filtered;
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
 
                   {/* Buttons */}
                   <div className="text-center mt-4">
@@ -393,15 +376,12 @@ const AddArea = () => {
                       <Button type="primary" htmlType="submit" size="large">
                         {params.id ? "Update Area" : "Add Area"}
                       </Button>
-
-                      <Button
-                        size="large"
-                        onClick={() => navigate("/area")}
-                      >
+                      <Button size="large" onClick={() => navigate("/area")}>
                         Cancel
                       </Button>
                     </Space>
                   </div>
+
                 </div>
               </Form>
             </div>

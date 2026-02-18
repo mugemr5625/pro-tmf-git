@@ -19,7 +19,7 @@ import {
   Tag,
   Spin
 } from "antd";
-import { GET, DELETE, POST } from "helpers/api_helper";
+import { GET, DELETE, POST,PUT } from "helpers/api_helper";
 import { CUSTOMERS } from "helpers/url_helper";
 import Loader from "components/Common/Loader";
 import SwipeablePanel from "components/Common/SwipeablePanel";
@@ -90,6 +90,7 @@ const ViewCustomer = () => {
   const [reorderLoader, setReorderLoader] = useState(false);
   const [isDragMode, setIsDragMode] = useState(false);
   const [reorderAreaName, setReorderAreaName] = useState(null);
+  const [originalOrder, setOriginalOrder] = useState([]); // Track original order for diff
 
   const CUSTOMERS_PAGE_SIZE = 10;
 
@@ -120,14 +121,38 @@ const ViewCustomer = () => {
       setLineLoading(true);
       const response = await GET("api/line_dd");
       if (response?.status === 200) {
-        setLineDropdownList(response.data);
-      } else {
-        notification.error({ message: "Error", description: "Failed to fetch lines" });
+        const lines = Array.isArray(response.data) ? response.data : [];
+        setLineDropdownList(lines);
+        if (lines.length === 0) {
+          notification.warning({
+            message: "No Lines Available",
+            description: "No lines have been assigned to you. Please contact your administrator.",
+            duration: 5,
+          });
+        }
+      } else if (response?.data?.detail === "No Line Exist" || response?.status === 404) {
         setLineDropdownList([]);
+        notification.warning({
+          message: "No Lines Found",
+          description: "No lines have been assigned to you. Please contact your administrator.",
+          duration: 5,
+        });
+      } else {
+        setLineDropdownList([]);
+        notification.error({ message: "Error", description: "Failed to fetch lines" });
       }
     } catch (error) {
-      notification.error({ message: "Error", description: "Failed to fetch lines" });
+      const detail = error?.response?.data?.detail;
       setLineDropdownList([]);
+      if (detail === "No Line Exist") {
+        notification.warning({
+          message: "No Lines Found",
+          description: "No lines have been assigned to you. Please contact your administrator.",
+          duration: 5,
+        });
+      } else {
+        notification.error({ message: "Error", description: "Failed to fetch lines" });
+      }
     } finally {
       setLineLoading(false);
     }
@@ -190,6 +215,10 @@ const ViewCustomer = () => {
     setSelectedLineName(tempLineName);
     setSelectedAreaId(tempAreaId);
     setSelectedAreaName(tempAreaName);
+    localStorage.setItem("selected_line_id", tempLineId);
+  localStorage.setItem("selected_line_name", tempLineName);
+  localStorage.setItem("selected_area_id", tempAreaId);
+  localStorage.setItem("selected_area_name", tempAreaName);
 
     setFilterModalVisible(false);
     await fetchCustomerData(tempLineId, tempAreaId);
@@ -280,6 +309,10 @@ const ViewCustomer = () => {
     setTempAreaId(null);
     setTempAreaName(null);
     setFilteredAreaList([]);
+    localStorage.removeItem("selected_line_id");
+localStorage.removeItem("selected_line_name");
+localStorage.removeItem("selected_area_id");
+localStorage.removeItem("selected_area_name");
 
     // Clear data & UI state
     setCustomers([]);
@@ -293,6 +326,7 @@ const ViewCustomer = () => {
     setOrder({});
     setRowReorderred(false);
     setIsDragMode(false);
+    setOriginalOrder([]); // Clear original order
 
     setFilterModalVisible(true);
   };
@@ -304,8 +338,6 @@ const ViewCustomer = () => {
   const groupCustomersByArea = (data) => {
     const grouped = {};
     data.forEach((customer) => {
-      // After filtering by area_id the API returns customers for one area,
-      // but we still group by areaName for the section header.
       const areaName = customer.area_name || selectedAreaName || `Area ${customer.area}` || "Uncategorized";
       if (!grouped[areaName]) grouped[areaName] = [];
       grouped[areaName].push(customer);
@@ -393,6 +425,12 @@ const ViewCustomer = () => {
     setOrder({});
     setRowReorderred(false);
     setShowReset(false);
+
+    // Store original order with IDs and their positions
+    setOriginalOrder(customers.map((item, index) => ({
+      id: item.id,
+      originalIndex: index,
+    })));
   };
 
   const handleReOrder = (event, row) => {
@@ -421,29 +459,70 @@ const ViewCustomer = () => {
     return customers;
   };
 
+  // Get only the items whose position has changed
+  const getReorderedItems = (currentData) => {
+    const reorderedItems = [];
+
+    currentData.forEach((item, newIndex) => {
+      const originalItem = originalOrder.find((orig) => orig.id === item.id);
+
+      if (originalItem && originalItem.originalIndex !== newIndex) {
+        reorderedItems.push({
+          id: item.id,
+          newOrder: newIndex + 1,
+          oldOrder: originalItem.originalIndex + 1,
+        });
+      }
+    });
+
+    return reorderedItems;
+  };
+
   const submitReorder = async () => {
     try {
       setReorderLoader(true);
-      const reorderedData = Object.keys(order)?.length > 0 ? sortData(order) : customers;
-      const apiPayload = reorderedData.map((item, index) => ({ ...item, order: index + 1 }));
 
-      const response = await POST(`${CUSTOMERS}reorder/`, apiPayload);
+      // Get current order (either from drag-drop or manual reorder)
+      const reorderedData = Object.keys(order)?.length > 0 ? sortData(order) : customers;
+
+      // Get only the items that were reordered
+      const reorderedItems = getReorderedItems(reorderedData);
+
+      if (reorderedItems.length === 0) {
+        notification.info({
+          message: "No Changes",
+          description: "No customers were reordered.",
+        });
+        setReorderLoader(false);
+        return;
+      }
+
+      // Send only IDs of reordered items
+      const payload = {
+        ordered_ids: reorderedItems.map((item) => item.id),
+      };
+
+      const response = await PUT(`api/customers-reorder/`, payload);
+
       if (response?.status === 200) {
         setCustomers(reorderedData);
         setAreaCustomers(reorderedData);
         const grouped = groupCustomersByArea(reorderedData);
         setGroupedData(grouped);
-        Object.keys(grouped).forEach((areaName) => initializeAreaPagination(areaName, grouped[areaName].length));
+        Object.keys(grouped).forEach((areaName) =>
+          initializeAreaPagination(areaName, grouped[areaName].length)
+        );
 
         setReorder(false);
         setReorderAreaName(null);
         setOrder({});
         setRowReorderred(false);
         setIsDragMode(false);
+        setOriginalOrder([]); // Clear original order
 
         notification.success({
           message: "Re-Ordered",
-          description: "The customer order has been updated successfully.",
+          description: `Successfully reordered ${reorderedItems.length} customer(s).`,
           duration: 3,
         });
       } else {
@@ -462,12 +541,15 @@ const ViewCustomer = () => {
     setOrder({});
     setRowReorderred(false);
     setIsDragMode(false);
+    setOriginalOrder([]); // Clear original order
 
     // Restore original area snapshot
     const grouped = groupCustomersByArea(areaCustomers);
     setCustomers(areaCustomers);
     setGroupedData(grouped);
-    Object.keys(grouped).forEach((areaName) => initializeAreaPagination(areaName, grouped[areaName].length));
+    Object.keys(grouped).forEach((areaName) =>
+      initializeAreaPagination(areaName, grouped[areaName].length)
+    );
   };
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -598,23 +680,23 @@ const ViewCustomer = () => {
           Select Line Name
         </label>
         <Select
-          placeholder="Select a line"
-          style={{ width: "100%" }}
-          onChange={handleLineChange}
-          value={tempLineId}
-          loading={lineLoading}
-          notFoundContent={lineLoading ? <Spin size="small" /> : "No data"}
-          showSearch
-          filterOption={(input, option) =>
-            (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
-          }
-        >
-          {lineDropdownList.map((line) => (
-            <Select.Option key={line.line_id} value={line.line_id}>
-              {line.line_name}
-            </Select.Option>
-          ))}
-        </Select>
+  placeholder={lineLoading ? "Loading lines..." : "Select a line"}
+  style={{ width: "100%" }}
+  onChange={handleLineChange}
+  value={tempLineId}
+  disabled={lineLoading}
+  showSearch
+  suffixIcon={lineLoading ? <Spin size="small" /> : undefined}
+  filterOption={(input, option) =>
+    (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+  }
+>
+  {lineDropdownList.map((line) => (
+    <Select.Option key={line.line_id} value={line.line_id}>
+      {line.line_name}
+    </Select.Option>
+  ))}
+</Select>
       </div>
 
       {/* Area select */}
@@ -622,25 +704,30 @@ const ViewCustomer = () => {
         <label style={{ fontWeight: "400", display: "block", marginBottom: "5px" }}>
           Select Area Name
         </label>
-        <Select
-          placeholder={tempLineId ? "Select an area" : "Select a line first"}
-          style={{ width: "100%" }}
-          onChange={handleAreaChange}
-          value={tempAreaId}
-          disabled={!tempLineId}
-          loading={areaLoading}
-          notFoundContent={areaLoading ? <Spin size="small" /> : "No areas found"}
-          showSearch
-          filterOption={(input, option) =>
-            (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
-          }
-        >
-          {filteredAreaList.map((area) => (
-            <Select.Option key={area.id} value={area.id}>
-              {area.areaName}
-            </Select.Option>
-          ))}
-        </Select>
+       <Select
+  placeholder={
+    !tempLineId
+      ? "Select a line first"
+      : areaLoading
+      ? "Loading areas..."
+      : "Select an area"
+  }
+  style={{ width: "100%" }}
+  onChange={handleAreaChange}
+  value={tempAreaId}
+  disabled={!tempLineId || areaLoading}
+  showSearch
+  suffixIcon={areaLoading ? <Spin size="small" /> : undefined}
+  filterOption={(input, option) =>
+    (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+  }
+>
+  {filteredAreaList.map((area) => (
+    <Select.Option key={area.id} value={area.id}>
+      {area.areaName}
+    </Select.Option>
+  ))}
+</Select>
       </div>
     </Modal>
   );
@@ -770,7 +857,7 @@ const ViewCustomer = () => {
               type="primary"
               onClick={submitReorder}
               loading={reorderLoader}
-              disabled={reorderLoader || !rowReorderred}
+              disabled={reorderLoader}
             >
               Submit
             </Button>

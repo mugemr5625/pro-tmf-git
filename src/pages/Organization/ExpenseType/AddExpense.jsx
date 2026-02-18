@@ -280,55 +280,66 @@ const AddExpense = () => {
                                     {/* Branch and Line Selection */}
                                     <div className="row mb-3">
                                         <div className="col-md-6">
-                                            <Form.Item
-                                                label="Branch Name"
-                                                name="branch_id"
-                                                rules={[{ required: true, message: "Please select a branch" }]}
-                                            >
-                                                <SelectWithAddon
-                                                    icon={<BankOutlined />}
-                                                    placeholder="Select branch"
-                                                    size="large"
-                                                    onChange={handleBranchChange}
-                                                    showSearch
-                                                    filterOption={(input, option) =>
-                                                        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                                                    }
-                                                    notFoundContent={branchLoading ? <Spin size="small" /> : "No branches"}
-                                                >
-                                                    {branches.map((branch) => (
-                                                        <Option key={branch.id} value={branch.id}>
-                                                            {branch.branch_name}
-                                                        </Option>
-                                                    ))}
-                                                </SelectWithAddon>
-                                            </Form.Item>
-                                        </div>
+  <Form.Item
+    label="Branch Name"
+    name="branch_id"
+    rules={[{ required: true, message: "Please select a branch" }]}
+  >
+    <SelectWithAddon
+      icon={branchLoading ? <Spin size="small" /> : <BankOutlined />}
+      placeholder={branchLoading ? "Loading branch..." : "Select branch"}
+      size="large"
+      onChange={handleBranchChange}
+      showSearch
+      filterOption={(input, option) =>
+        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+      }
+      notFoundContent={branchLoading ? <Spin size="small" /> : "No branches"}
+    >
+      {branches.map((branch) => (
+        <Option key={branch.id} value={branch.id}>
+          {branch.branch_name}
+        </Option>
+      ))}
+    </SelectWithAddon>
+  </Form.Item>
+</div>
                                         <div className="col-md-6">
-                                            <Form.Item
-                                                label="Line Name"
-                                                name="line_id"
-                                                rules={[{ required: true, message: "Please select a line" }]}
-                                            >
-                                                <SelectWithAddon
-                                                    icon={<ApartmentOutlined />}
-                                                    placeholder={selectedBranch ? "Select line" : "First select a branch"}
-                                                    size="large"
-                                                    disabled={!selectedBranch}
-                                                    showSearch
-                                                    filterOption={(input, option) =>
-                                                        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                                                    }
-                                                    notFoundContent={lineLoading ? <Spin size="small" /> : "No lines"}
-                                                >
-                                                    {lines.map((line) => (
-                                                        <Option key={line.line_id} value={line.line_id}>
-                                                            {line.line_name}
-                                                        </Option>
-                                                    ))}
-                                                </SelectWithAddon>
-                                            </Form.Item>
-                                        </div>
+  <Form.Item
+    label="Line Name"
+    name="line_id"
+    rules={[{ required: true, message: "Please select a line" }]}
+  >
+    <SelectWithAddon
+      icon={branchLoading || lineLoading ? <Spin size="small" /> : <ApartmentOutlined />}
+      placeholder={
+        branchLoading
+          ? "Loading branch..."
+          : lineLoading
+          ? "Loading lines..."
+          : !selectedBranch
+          ? "Select a branch first"
+          : "Select line"
+      }
+      size="large"
+      disabled={branchLoading || lineLoading || !selectedBranch}
+      showSearch
+      filterOption={(input, option) =>
+        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+      }
+      notFoundContent={lineLoading ? <Spin size="small" /> : "No lines"}
+      style={{
+        backgroundColor: !selectedBranch ? '#f5f5f5' : '#ffffff',
+      }}
+    >
+      {lines.map((line) => (
+        <Option key={line.line_id} value={line.line_id}>
+          {line.line_name}
+        </Option>
+      ))}
+    </SelectWithAddon>
+  </Form.Item>
+</div>
                                     </div>
 
                                     {/* Expense Details */}

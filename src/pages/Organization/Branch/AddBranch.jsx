@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from "react";
-import { notification, Form, Input, Button, Upload, message, Divider, Space, Card, Modal, Spin, Alert } from "antd";
-import { UploadOutlined, PlusOutlined, MinusOutlined, BankOutlined, FileTextOutlined, CameraOutlined, EyeOutlined, DeleteOutlined, FileOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { notification, Form, Input, Button, Upload, message, Divider, Space, Card, Modal, Spin } from "antd";
+import {
+  UploadOutlined, CloudUploadOutlined, PlusOutlined, MinusOutlined,
+  BankOutlined, FileTextOutlined, CameraOutlined, EyeOutlined,
+  DeleteOutlined, FileOutlined, CloseCircleOutlined,
+} from '@ant-design/icons';
 import { ToastContainer } from "react-toastify";
 import Loader from "components/Common/Loader";
-import { ADD_BRANCH, BRANCH_FILE } from "helpers/url_helper";
-import { UPLOAD_CERTIFCATE, GET_BRANCHES, CREATE_BRANCH, DELETE,PUT } from "helpers/api_helper";
+import { ADD_BRANCH } from "helpers/url_helper";
+import { UPLOAD_CERTIFCATE, GET_BRANCHES, CREATE_BRANCH, PUT, DELETE } from "helpers/api_helper";
 import { useParams, useNavigate } from "react-router-dom";
-import { ERROR_MESSAGES, SUCCESS_MESSAGES, NOTIFICATION_TITLES, FILE_MESSAGES } from "helpers/errorMessages";
+import { ERROR_MESSAGES, FILE_MESSAGES } from "helpers/errorMessages";
 import InputWithAddon from "components/Common/InputWithAddon";
 import CameraCapture from '../../../components/Common/CameraCapture';
-import '../responsive.css'
+import '../responsive.css';
 
 const AddBranch = () => {
   const [loader, setLoader] = useState(false);
@@ -17,481 +21,376 @@ const AddBranch = () => {
   const params = useParams();
   const navigate = useNavigate();
 
-  const [agreementFile, setAgreementFile] = useState(null);
-  const [additionalFiles, setAdditionalFiles] = useState([]);
-  const [additionalSelectedFiles, setAdditionalSelectedFiles] = useState([]);
+  const [branchId, setBranchId] = useState(null);
+  const [isBasicInfoSaved, setIsBasicInfoSaved] = useState(false);
 
-  // Camera states
+  const [docFields, setDocFields] = useState([{ id: 0, file: null, loading: false }]);
+  const [existingDocs, setExistingDocs] = useState([]);
+
   const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraFieldRef = useRef({ fieldId: null, fieldType: null });
+  const cameraFieldRef = useRef({ fieldId: null });
 
-  // Preview states
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewContent, setPreviewContent] = useState(null);
   const [previewType, setPreviewType] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  // Existing documents state
-  const [existingAgreementDoc, setExistingAgreementDoc] = useState(null);
-  const [existingAdditionalDocs, setExistingAdditionalDocs] = useState([]);
+  const [formUpdateTrigger, setFormUpdateTrigger] = useState(0);
 
+  // ── Fetch branch documents ────────────────────────────────────────────────
+  const fetchBranchDocuments = async (id) => {
+    try {
+      const response = await GET_BRANCHES(`/api/branch-documents/?branch_id=${id}`);
+      if (response.status === 200) {
+        const docs = response.data?.results || [];
+        setExistingDocs(docs);
+
+        if (docs.length > 0) {
+          setDocFields(docs.map((_, i) => ({ id: i, file: null, loading: false })));
+          form.setFieldsValue({
+            branch_documents: docs.map((doc) => ({
+              document_type: doc.document_type || '',
+              document_description: doc.document_description || '',
+            })),
+          });
+        } else {
+          setDocFields([{ id: 0, file: null, loading: false }]);
+          form.setFieldsValue({ branch_documents: [{ document_type: '', document_description: '' }] });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch branch documents:', error);
+    }
+  };
+
+  // ── Fetch branch details (edit mode) ─────────────────────────────────────
   const getBranchDetails = async () => {
-  setLoader(true);
-  const response = await GET_BRANCHES(`${ADD_BRANCH}${params.id}`);
-  if (response.status === 200) {
-    const { data } = response;
-    
-    // Store existing agreement document - handle null case
-    setExistingAgreementDoc(
-      data.agreement_certificate && data.agreement_certificate.length > 0 
-        ? data.agreement_certificate[0] 
-        : null
-    );
-    
-    // Store existing additional documents - handle null/undefined case
-    setExistingAdditionalDocs(data.additional_details || []);
-    
-    // Handle agreement certificate - check for null/empty array
-    const agreementFileList = 
-      data.agreement_certificate && 
-      data.agreement_certificate.length > 0 && 
-      data.agreement_certificate[0]
-        ? [
-            {
-              uid: '-1',
-              name: data.agreement_certificate[0].file_name,
-              status: 'done',
-              url: data.agreement_certificate[0].signed_url,
-            },
-          ]
-        : [];
-    
-    // Handle additional certificates - check for null/undefined
-    const additionalCertificateDetails = (data.additional_details || []).map((file, index) => ({
-      additional_certificate: file
-        ? [
-            {
-              uid: `-${index + 1}`,
-              name: file.file_name,
-              status: 'done',
-              url: file.signed_url,
-            },
-          ]
-        : [],
-      additional_certifi_description: file?.additional_certifi_description || '',
-    }));
-    
-    form.setFieldsValue({
-      ...data,
-      agreement_certificate: agreementFileList,
-      additional_certificate_details: additionalCertificateDetails.length > 0 
-        ? additionalCertificateDetails 
-        : [{ additional_certificate: [], additional_certifi_description: "" }],
-    });
+    setLoader(true);
+    try {
+      const response = await GET_BRANCHES(`${ADD_BRANCH}${params.id}`);
+      if (response.status === 200) {
+        const { data } = response;
+        setBranchId(params.id);
+        setIsBasicInfoSaved(true);
 
-    // Set agreement file - handle null case
-    setAgreementFile(
-      response?.data.agreement_certificate && response?.data.agreement_certificate.length > 0
-        ? response.data.agreement_certificate[0] 
-        : null
-    );
-    
-    // Set additional files - handle null/undefined case
-    setAdditionalFiles(response?.data.additional_details || []);
-    setAdditionalSelectedFiles(new Array(response?.data.additional_details?.length || 0).fill(null));
-  }
-  setLoader(false);
-};
-  
+        form.setFieldsValue({
+          branch_name: data.branch_name,
+          branch_address: data.branch_address,
+        });
+
+        await fetchBranchDocuments(params.id);
+      }
+    } catch (error) {
+      notification.error({ message: 'Error', description: 'Failed to fetch branch details', duration: 3 });
+    } finally {
+      setLoader(false);
+    }
+  };
+
   useEffect(() => {
     if (params?.id) {
       getBranchDetails();
     } else {
-      form.setFieldsValue({
-        additional_certificate_details: [
-          {
-            additional_certificate: [],
-            additional_certifi_description: "",
-          },
-        ],
-      });
-      setAdditionalFiles([null]);
-      setAdditionalSelectedFiles([null]);
+      setDocFields([{ id: 0, file: null, loading: false }]);
+      setIsBasicInfoSaved(false);
+      setBranchId(null);
     }
   }, [params?.id]);
 
-  // Open camera
-  const openCamera = (fieldId, fieldType) => {
-    console.log('=== Opening Camera ===');
-    console.log('Field ID:', fieldId);
-    console.log('Field Type:', fieldType);
-    
-    cameraFieldRef.current = { fieldId, fieldType };
+  // ── Description filter ────────────────────────────────────────────────────
+  const descriptionValueFilter = (value) => {
+    if (value.length === 0) return '';
+    let filtered = '';
+    for (let i = 0; i < value.length; i++) {
+      if (i === 0) { if (/[A-Za-z]/.test(value[i])) filtered += value[i]; }
+      else { if (/[A-Za-z0-9\s]/.test(value[i])) filtered += value[i]; }
+    }
+    return filtered;
+  };
+
+  // ── Camera ────────────────────────────────────────────────────────────────
+  const openCamera = (fieldId) => {
+    cameraFieldRef.current = { fieldId };
     setCameraVisible(true);
   };
 
-  // Handle camera capture - only select, don't upload
   const handleCameraCapture = (file) => {
-    console.log('=== Camera Capture Received ===');
-    console.log('File:', file);
-    console.log('File type check:', file instanceof File);
-    console.log('File properties:', {
-      name: file?.name,
-      size: file?.size,
-      type: file?.type,
-      lastModified: file?.lastModified
-    });
-    
-    const { fieldId, fieldType } = cameraFieldRef.current;
-    
-    // More lenient file validation - check if it has File-like properties
+    const { fieldId } = cameraFieldRef.current;
     if (!file || !file.name || !file.type || file.size === undefined) {
-      console.error('Not a valid File object:', file);
       message.error('Invalid file received from camera');
       return;
     }
-
-    console.log('File validation passed');
-    console.log('Field type:', fieldType);
-    console.log('Field ID:', fieldId);
-
-    // Just set the file to state, don't upload yet
-    if (fieldType === 'agreement') {
-      setAgreementFile(file);
-      message.success(`${file.name} selected successfully`);
-    } else if (fieldType === 'additional') {
-      const updatedSelected = [...additionalSelectedFiles];
-      updatedSelected[fieldId] = file;
-      setAdditionalSelectedFiles(updatedSelected);
-      message.success(`${file.name} selected successfully`);
-    }
-    
-    cameraFieldRef.current = { fieldId: null, fieldType: null };
+    setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, file } : f)));
+    message.success(`${file.name} selected successfully`);
+    setFormUpdateTrigger((t) => t + 1);
+    cameraFieldRef.current = { fieldId: null };
   };
 
-  // Manual upload function (when Upload button is clicked)
-  const uploadFileManually = async (file, isAdditional = false, index = null) => {
-    console.log('=== Manual Upload ===');
-    console.log('File:', file);
-    console.log('Is Additional:', isAdditional, 'Index:', index);
-    
-    // More lenient file validation
-    if (!file || !file.name || !file.type || file.size === undefined) {
-      message.error('Invalid file object');
+  // ── File Select / Clear ───────────────────────────────────────────────────
+  const handleFileSelect = (file, fieldId) => {
+    const original = file.originFileObj || file;
+    setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, file: original } : f)));
+    message.success(`${original.name} selected successfully`);
+    setFormUpdateTrigger((t) => t + 1);
+    return false;
+  };
+
+  const handleClearFile = (fieldId) => {
+    setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, file: null } : f)));
+    message.info('File selection cleared.');
+    setFormUpdateTrigger((t) => t + 1);
+  };
+
+  // ── Upload single document ────────────────────────────────────────────────
+  const uploadDocument = async (fieldId, index, currentBranchId) => {
+    const fieldObj = docFields.find((f) => f.id === fieldId);
+    const file = fieldObj?.file;
+
+    if (!file) return true;
+
+    const docType = form.getFieldValue(['branch_documents', index, 'document_type']);
+    const docDescription = form.getFieldValue(['branch_documents', index, 'document_description']);
+
+    if (!docType || docType.trim() === '') {
+      form.setFields([{ name: ['branch_documents', index, 'document_type'], errors: ['Please enter document type'] }]);
+      return false;
+    }
+    if (!docDescription || docDescription.trim() === '') {
+      form.setFields([{ name: ['branch_documents', index, 'document_description'], errors: ['Please enter description'] }]);
+      return false;
+    }
+    if (!(file instanceof File)) {
+      notification.error({ message: 'Error', description: 'Invalid file object. Please select the file again.', duration: 3 });
+      return false;
+    }
+
+    setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: true } : f)));
+
+    const formData = new FormData();
+    formData.append('document_file', file, file.name);
+    formData.append('document_type', docType);
+    formData.append('document_description', docDescription);
+
+    try {
+      const response = await UPLOAD_CERTIFCATE(`/api/branch-documents/?branch_id=${currentBranchId}`, formData);
+      setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: false, file: null } : f)));
+
+      if (response.status === 200 || response.status === 201) {
+        form.setFieldValue(['branch_documents', index, 'document_type'], '');
+        form.setFieldValue(['branch_documents', index, 'document_description'], '');
+        return true;
+      } else {
+        throw new Error(response.statusText || 'Upload failed');
+      }
+    } catch (error) {
+      setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: false } : f)));
+      notification.error({ message: 'Upload Failed', description: error.message || FILE_MESSAGES.UPLOAD_FAILED, duration: 3 });
+      return false;
+    }
+  };
+
+  // ── MAIN SAVE ─────────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    try {
+      await form.validateFields(['branch_name', 'branch_address']);
+    } catch {
+      notification.error({ message: 'Validation Error', description: 'Please fill in all required fields', duration: 3 });
       return;
     }
 
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    
+    const values = form.getFieldsValue();
+    setLoader(true);
+
     try {
-      message.loading({ content: 'Uploading...', key: 'upload' });
-      const response = await UPLOAD_CERTIFCATE(BRANCH_FILE, formData);
-      
-      if (response.status === 200) {
-        const { signed_url, file_name } = response.data;
-        
-        if (isAdditional && index !== null) {
-          setAdditionalFiles(prev => {
-            const newFiles = [...prev];
-            newFiles[index] = { signed_url, file_name };
-            return newFiles;
-          });
-          // Clear the selected file after successful upload
-          const updatedAdditionalSelected = [...additionalSelectedFiles];
-          updatedAdditionalSelected[index] = null;
-          setAdditionalSelectedFiles(updatedAdditionalSelected);
-        } else {
-          setAgreementFile({ signed_url, file_name });
-          // Clear the selected agreement file after upload
-          setAgreementFile(null);
+      let currentBranchId = branchId;
+
+      // ── Step 1: POST or PUT basic info (skip POST if already saved in ADD mode) ──
+      if (!isBasicInfoSaved || params.id) {
+        const orgId = localStorage.getItem("org_id");
+        const payload = {
+          branch_name: values.branch_name,
+          branch_address: values.branch_address,
+          organization: orgId ? parseInt(orgId) : undefined,
+        };
+
+        const response = params.id
+          ? await PUT(`${ADD_BRANCH}${params.id}/`, payload)
+          : await CREATE_BRANCH(ADD_BRANCH, payload);
+
+        if (response.status === 200 || response.status === 201) {
+          if (params.id) {
+            currentBranchId = params.id;
+            notification.success({ message: 'Branch Updated', description: 'Basic info updated successfully.', duration: 3 });
+          } else {
+            currentBranchId = response.data.id;
+            setBranchId(currentBranchId);
+            setIsBasicInfoSaved(true);
+            notification.success({ message: 'Branch Created', description: 'Branch created. Now upload documents.', duration: 3 });
+          }
+        } else if (response.status === 400) {
+          const errorMessages = [];
+          if (response?.data) {
+            Object.keys(response.data).forEach((key) => {
+              errorMessages.push(Array.isArray(response.data[key]) ? response.data[key][0] : response.data[key]);
+            });
+          }
+          notification.error({ message: 'Error', description: errorMessages.join('\n') || 'Failed to save branch', duration: 4 });
+          return;
         }
-        
-        message.success({ content: `${file.name} ${FILE_MESSAGES.UPLOAD_SUCCESS}`, key: 'upload' });
-      } else {
-        throw new Error(response.statusText || ERROR_MESSAGES.BRANCH.UPLOAD_FAILED);
       }
+
+      // ── Step 2: Upload documents (only fields with a file selected) ────────
+      const fieldsWithFiles = docFields.filter((f) => f.file !== null);
+
+      if (fieldsWithFiles.length > 0) {
+        let allUploadsSuccessful = true;
+
+        for (const field of fieldsWithFiles) {
+          const index = docFields.findIndex((f) => f.id === field.id);
+          const success = await uploadDocument(field.id, index, currentBranchId);
+          if (!success) allUploadsSuccessful = false;
+        }
+
+        if (allUploadsSuccessful) {
+          notification.success({ message: 'Documents Uploaded', description: 'All documents uploaded successfully.', duration: 3 });
+        }
+
+        await fetchBranchDocuments(currentBranchId);
+      }
+
+      // In ADD mode navigate after done; in EDIT stay on page
+      if (!params.id) {
+        navigate('/branch/list');
+      }
+
     } catch (error) {
-      console.error('Upload error:', error);
-      message.error({ content: `${file.name} ${FILE_MESSAGES.UPLOAD_FAILED}`, key: 'upload' });
+      notification.error({
+        message: 'Error',
+        description: error?.response?.data?.detail || error.message || 'An error occurred. Please try again.',
+        duration: 3,
+      });
+    } finally {
+      setLoader(false);
     }
   };
 
-  // Upload camera captured file (auto-upload)
-  const uploadCameraFile = async (file, isAdditional = false, index = null) => {
-    console.log('=== Upload Camera File ===');
-    console.log('File:', file);
-    console.log('Is Additional:', isAdditional, 'Index:', index);
-    
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    
-    try {
-      message.loading({ content: 'Uploading...', key: 'camera-upload' });
-      const response = await UPLOAD_CERTIFCATE(BRANCH_FILE, formData);
-      
-      console.log('Upload response:', response);
-      
-      if (response.status === 200) {
-        const { signed_url, file_name } = response.data;
-        
-        if (isAdditional && index !== null) {
-          setAdditionalFiles(prev => {
-            const newFiles = [...prev];
-            newFiles[index] = { signed_url, file_name };
-            return newFiles;
-          });
-        } else {
-          setAgreementFile({ signed_url, file_name });
-        }
-        
-        message.success({ content: `${file.name} ${FILE_MESSAGES.UPLOAD_SUCCESS}`, key: 'camera-upload' });
-      } else {
-        throw new Error(response.statusText || ERROR_MESSAGES.BRANCH.UPLOAD_FAILED);
-      }
-    } catch (error) {
-      console.error('Camera upload error:', error);
-      message.error({ content: `${file.name} ${FILE_MESSAGES.UPLOAD_FAILED}`, key: 'camera-upload' });
-    }
-  };
-
-  // Delete document handler
-  const handleDeleteDocument = async (docId, fileName, isAgreement = false, index = null) => {
+  // ── Delete existing doc ───────────────────────────────────────────────────
+  const handleDeleteDocument = (docId, fileName) => {
     Modal.confirm({
       title: 'Confirm Delete',
-      content: `Are you sure you want to delete the document: ${fileName || 'Document'}?`,
+      content: `Are you sure you want to delete: ${fileName || 'Document'}?`,
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {
         try {
-          // If you have a DELETE endpoint for branch documents, use it here
-          // For now, we'll just remove from state
-          if (isAgreement) {
-            setExistingAgreementDoc(null);
-            setAgreementFile(null);
-            form.setFieldsValue({ agreement_certificate: [] });
-          } else if (index !== null) {
-            setExistingAdditionalDocs(prev => prev.filter((_, i) => i !== index));
-            setAdditionalFiles(prev => prev.filter((_, i) => i !== index));
-            
-            const currentDetails = form.getFieldValue("additional_certificate_details") || [];
-            currentDetails.splice(index, 1);
-            form.setFieldsValue({ additional_certificate_details: currentDetails });
+          const deleteResponse = await DELETE(`/api/branch-documents/${docId}/?branch_id=${branchId}`);
+          if (deleteResponse.status !== 200 && deleteResponse.status !== 204) {
+            notification.error({ message: 'Error', description: 'Failed to delete document.', duration: 3 });
+            return;
           }
-          
-          notification.success({
-            message: 'Deleted',
-            description: `${fileName || 'Document'} deleted successfully.`,
-            duration: 3,
-          });
+
+          const deletedIndex = existingDocs.findIndex((d) => d.id === docId);
+          setExistingDocs((prev) => prev.filter((d) => d.id !== docId));
+
+          if (deletedIndex !== -1) {
+            const currentDocs = form.getFieldValue('branch_documents') || [];
+            currentDocs.splice(deletedIndex, 1);
+
+            if (currentDocs.length === 0) {
+              form.setFieldsValue({ branch_documents: [{ document_type: '', document_description: '' }] });
+              setDocFields([{ id: 0, file: null, loading: false }]);
+            } else {
+              form.setFieldsValue({ branch_documents: [...currentDocs] });
+              setDocFields((prev) => prev.filter((_, i) => i !== deletedIndex));
+            }
+          }
+
+          notification.success({ message: 'Deleted', description: `${fileName || 'Document'} deleted successfully.`, duration: 3 });
         } catch (error) {
-          notification.error({
-            message: 'Error',
-            description: error.message || 'An error occurred during deletion.',
-            duration: 3,
-          });
+          notification.error({ message: 'Error', description: error.message || 'Deletion failed.', duration: 3 });
         }
       },
     });
   };
 
-  // View document
+  // ── Add / Remove doc fields ───────────────────────────────────────────────
+  const addDocField = () => {
+    const newId = Date.now();
+    setDocFields((prev) => [...prev, { id: newId, file: null, loading: false }]);
+    const current = form.getFieldValue('branch_documents') || [];
+    form.setFieldsValue({ branch_documents: [...current, { document_type: '', document_description: '' }] });
+  };
+
+  const removeDocField = (fieldId, index) => {
+    setDocFields((prev) => prev.filter((f) => f.id !== fieldId));
+    const current = form.getFieldValue('branch_documents') || [];
+    current.splice(index, 1);
+    form.setFieldsValue({ branch_documents: [...current] });
+  };
+
+  // ── Preview ───────────────────────────────────────────────────────────────
   const SecurePDFPreview = ({ url }) => {
     const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
-
     return (
       <div style={{ margin: 0, padding: 0 }}>
-        <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
-          <Button 
-            type="primary" 
-            size="small"
-            onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-          >
+        <div style={{ marginBottom: 8 }}>
+          <Button type="primary" size="small" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
             Open PDF in New Tab
           </Button>
         </div>
-        
-        <iframe
-          src={googleViewerUrl}
-          title="PDF Preview"
-          width="100%"
-          height="600px"
-          style={{ 
-            border: '1px solid #d9d9d9', 
-            borderRadius: 4,
-            display: 'block',
-            margin: 0
-          }}
-        />
+        <iframe src={googleViewerUrl} title="PDF Preview" width="100%" height="600px"
+          style={{ border: '1px solid #d9d9d9', borderRadius: 4, display: 'block', margin: 0 }} />
       </div>
     );
   };
 
   const viewDocument = (documentUrl, fileName) => {
     if (!documentUrl || typeof documentUrl !== 'string') {
-      notification.error({
-        message: 'Error',
-        description: 'Document URL not found or invalid',
-        duration: 3,
-      });
+      notification.error({ message: 'Error', description: 'Document URL not found or invalid', duration: 3 });
       return;
     }
-
     let fileExtension = '';
-    if (fileName && typeof fileName === 'string') {
+    if (fileName) {
       fileExtension = fileName.split('.').pop().toLowerCase();
     } else {
-      const urlWithoutParams = documentUrl.split('?')[0];
-      fileExtension = urlWithoutParams.split('.').pop().toLowerCase();
+      fileExtension = documentUrl.split('?')[0].split('.').pop().toLowerCase();
     }
-    
     if (fileExtension === 'pdf') {
-      setPreviewType('pdf');
-      setPreviewContent(documentUrl);
-      setPreviewVisible(true);
+      setPreviewType('pdf'); setPreviewContent(documentUrl); setPreviewVisible(true);
       return;
     }
-
     if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension)) {
-      setPreviewType('image');
-      setPreviewContent(documentUrl);
-      setPreviewVisible(true);
-      setPreviewLoading(true);
+      setPreviewType('image'); setPreviewContent(documentUrl); setPreviewVisible(true); setPreviewLoading(true);
       return;
     }
-
-    try {
-      window.open(documentUrl, '_blank');
-    } catch (error) {
-      console.error('Error opening document:', error);
-      notification.error({
-        message: 'Error',
-        description: 'Failed to open document',
-        duration: 3,
-      });
-    }
+    window.open(documentUrl, '_blank');
   };
 
-  // Render existing document card
-  const renderExistingDocument = (doc, fileName, isAgreement = false, index = null) => {
-    if (!doc) return null;
-
-    return (
-      <Card 
-        size="small" 
-        style={{ marginBottom: '12px', backgroundColor: '#f6ffed' }}
-      >
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileOutlined style={{ fontSize: '16px', color: '#52c41a' }} />
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '500' }}>
-                {fileName || 'Document'}
-              </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                Existing Document
-              </div>
-            </div>
-          </div>
-          <Space>
-            <Button 
-              type="link" 
-              icon={<EyeOutlined />}
-              onClick={() => viewDocument(doc.signed_url || doc.url, fileName)}
-              size="small"
-            >
-              View
-            </Button>
-            <Button 
-              type="link" 
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDeleteDocument(doc.id, fileName, isAgreement, index)}
-              size="small"
-            >
-              Delete
-            </Button>
-          </Space>
-        </div>
-      </Card>
-    );
-  };
-
- const onFinish = async values => {
-  setLoader(true);
-  try {
-    const payload = {
-      branch_name: values.branch_name,
-      branch_address: values.branch_address,
-      agreement_certificate: agreementFile ? [agreementFile] : [],
-      agreement_description: values.agreement_description,
-      additional_details: additionalFiles.map((file, index) => ({
-        ...file,
-        additional_certifi_description:
-          values.additional_certificate_details[index]?.additional_certifi_description,
-      })),
-    };
-
-    let response;
-    
-    if (params.id) {
-      // Edit mode - use PUT API
-      response = await PUT(`${ADD_BRANCH}${params.id}/`, payload);
-    } else {
-      // Create mode - use POST API
-      response = await CREATE_BRANCH(ADD_BRANCH, payload);
-    }
-
-    if (response.status === 200 || response.status === 201) {
-      notification.success({
-        message: NOTIFICATION_TITLES.BRANCH,
-        description: params.id ? SUCCESS_MESSAGES.BRANCH.UPDATED : SUCCESS_MESSAGES.BRANCH.CREATED,
-        duration: 2,
-      });
-      navigate("/branch/list");
-    }
-  } catch (error) {
-    notification.error({
-      message: ERROR_MESSAGES.BRANCH.OPERATION_FAILED,
-      description: error.message,
-      duration: 0,
-    });
-  } finally {
-    setLoader(false);
-  }
-};
-
-  const fileRemove = () => {
-    setAgreementFile(null);
-    form.setFieldsValue({ agreement_description: "" });
-  };
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       {loader && <Loader />}
 
-      <div className="page-content" style={{
-        marginRight: "10px",
-        marginLeft: "-10px", maxWidth: "100%"
-      }}>
-        <div className="container-fluid" style={{
-          marginTop: -100,
-          padding: 0,
-        }}>
+      <div className="page-content" style={{ marginRight: '10px', marginLeft: '-10px', maxWidth: '100%' }}>
+        <div className="container-fluid" style={{ marginTop: -100, padding: 0 }}>
           <div className="row">
             <div className="col-md-12">
-               <div className="sticky-branch-header">
-              <h2 className="add-branch-title" style={{ position: 'sticky',zIndex:'100' ,margin: 0, fontSize: "24px", fontWeight: 600 }}>
-                {params.id ? "Edit Branch" : "Add Branch"}
-              </h2>
-        </div>
-              <Form form={form} layout="vertical"  className="add-branch-form" onFinish={onFinish} style={{ padding: 0, marginRight: "-20px", marginBottom: "-30px" }}>
+
+              <div className="add-branch-header">
+                <h2 className="add-branch-title">
+                  {params.id ? 'Edit Branch' : 'Add Branch'}
+                </h2>
+              </div>
+
+              <Form
+                form={form}
+                layout="vertical"
+                className="add-branch-form"
+                style={{ padding: 0, marginRight: '-20px', marginBottom: '-30px' }}
+              >
                 <div className="container" style={{ padding: 0 }}>
-                  {/* Branch Details */}
+
+                  {/* ── Basic Info ────────────────────────────────────────── */}
                   <div className="row mb-1 mt-2">
                     <div className="col-md-6">
                       <Form.Item
@@ -499,16 +398,20 @@ const AddBranch = () => {
                         name="branch_name"
                         rules={[
                           { required: true, message: ERROR_MESSAGES.BRANCH.BRANCH_NAME_REQUIRED },
-                          { pattern: /^[A-Za-z\s]+$/, message: 'Branch name must contain only alphabets' }
+                          { pattern: /^[A-Za-z][A-Za-z0-9\-\s]*$/, message: 'Branch name must start with an alphabet' },
                         ]}
                       >
                         <InputWithAddon
                           icon={<BankOutlined />}
                           placeholder="Enter branch name"
-                          onKeyPress={(e) => {
-                            if (!/[A-Za-z\s]/.test(e.key)) {
-                              e.preventDefault();
+                          onValueFilter={(value) => {
+                            if (value.length === 0) return '';
+                            let filtered = '';
+                            for (let i = 0; i < value.length; i++) {
+                              if (i === 0) { if (/[A-Za-z]/.test(value[i])) filtered += value[i]; }
+                              else { if (/[A-Za-z0-9\-\s]/.test(value[i])) filtered += value[i]; }
                             }
+                            return filtered;
                           }}
                         />
                       </Form.Item>
@@ -521,403 +424,216 @@ const AddBranch = () => {
                       >
                         <Input.TextArea
                           placeholder="Enter branch address"
-                          rows={3}
                           allowClear
                           autoSize={{ minRows: 2, maxRows: 8 }}
-                          style={{ resize: "both" }}
+                          style={{ resize: 'both' }}
                         />
                       </Form.Item>
                     </div>
                   </div>
 
-                  {/* Agreement Certificate */}
-                  <Divider style={{ borderTop: "2px solid #d9d9d9" }} />
-                 <Divider 
-  orientation="center"
-  style={{ 
-    borderTopWidth: '3px',
-    borderColor: '#d9d9d9'
-  }}
->Agreement</Divider>
-                  
-                  {/* Show existing agreement document */}
-                  {existingAgreementDoc && renderExistingDocument(
-                    existingAgreementDoc, 
-                    existingAgreementDoc.file_name, 
-                    true
-                  )}
-                  
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <Form.Item
-                        label="File Upload"
-                      >
-                        <Space.Compact style={{ width: '100%', marginBottom: agreementFile ? '8px' : '0' }}>
-                          <Upload
-                            maxCount={1}
-                            multiple={false}
-                            beforeUpload={(file) => {
-                              setAgreementFile(file);
-                              message.success(`${file.name} selected successfully`);
-                              return false;
-                            }}
-                            accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx"
-                            showUploadList={false}
-                            fileList={[]}
-                          >
-                            <Button icon={<UploadOutlined />} style={{ width: '100%' }}>
-                              Browse
-                            </Button>
-                          </Upload>
-                          <Button 
-                            icon={<CameraOutlined />}
-                            onClick={() => openCamera(null, 'agreement')}
-                            title="Capture with Camera"
-                          >
-                            Camera
-                          </Button>
-                          <Button 
-                            type="primary" 
-                            icon={<UploadOutlined />}
-                            onClick={() => {
-                              if (agreementFile && agreementFile instanceof File) {
-                                uploadFileManually(agreementFile, false, null);
-                              } else {
-                                message.error('Please select a file first');
-                              }
-                            }}
-                            disabled={!agreementFile || !(agreementFile instanceof File)}
-                          >
-                            Upload
-                          </Button>
-                        </Space.Compact>
-                        
-                        {/* Show selected file with clear button - only if it's a File object (not uploaded yet) */}
-                        {agreementFile && agreementFile instanceof File && (
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'space-between',
-                            padding: '4px 11px',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '6px',
-                            backgroundColor: '#f6ffed'
-                          }}>
-                            <div 
-                              style={{ 
-                                fontSize: '13px', 
-                                color: '#52c41a', 
-                                fontWeight: '500',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                maxWidth: 'calc(100% - 30px)'
-                              }}
-                              title={agreementFile.name}
-                            >
-                              <FileOutlined style={{ marginRight: '5px' }} />
-                              {agreementFile.name}
-                            </div>
-                            <Button
-                              icon={<CloseCircleOutlined />} 
-                              onClick={() => {
-                                setAgreementFile(null);
-                                message.info('File selection cleared.');
-                              }}
-                              danger
-                              type="text"
-                              size="small"
-                              title="Clear selected file"
-                              style={{ 
-                                padding: '0', 
-                                height: 'auto',
-                                marginLeft: '8px'
-                              }}
-                            />
-                          </div>
-                        )}
-                      </Form.Item>
-                    </div>
-                    <div className="col-md-6">
-                      <Form.Item
-  label="File Description"
-  name="agreement_description"
-  rules={[
-    { required: true, message: 'Please enter description' },
-    { 
-      pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, 
-      message: 'Description must start with an alphabet' 
-    }
-  ]}
->
-  <InputWithAddon
-    icon={<FileTextOutlined />}
-    placeholder="Enter file description"
-    onValueFilter={(value) => {
-      if (value.length === 0) return '';
-      
-      // First character must be alphabet
-      let filtered = '';
-      for (let i = 0; i < value.length; i++) {
-        if (i === 0) {
-          if (/[A-Za-z]/.test(value[i])) {
-            filtered += value[i];
-          }
-        } else {
-          if (/[A-Za-z0-9\s]/.test(value[i])) {
-            filtered += value[i];
-          }
-        }
-      }
-      return filtered;
-    }}
-  />
-</Form.Item>
-                    </div>
-                  </div>
-                  <Divider style={{ borderTop: "2px solid #d9d9d9" }} />
+                  {/* ── Documents — visible in EDIT always, in ADD after first save ── */}
+                  {(params.id || isBasicInfoSaved) && (
+                    <>
+                      <Divider style={{ borderTop: '2px solid #d9d9d9' }} />
+                      <Divider orientation="center" style={{ borderTopWidth: '3px', borderColor: '#d9d9d9' }}>
+                        Branch Documents
+                      </Divider>
 
-                  {/* Certificates Section */}
-                 <Divider 
-  orientation="center"
-  style={{ 
-    borderTopWidth: '3px',
-    borderColor: '#d9d9d9'
-  }}
->Certificates</Divider>
-                  <Form.List name="additional_certificate_details">
-                    {(fields, { add, remove }) => (
-                      <>
-                        {fields.map(({ key, name, ...restField }, index) => (
-                          <div key={key} className="row mb-4">
-                            {fields.length > 1 && (
-                             <Divider 
-  orientation="center"
-  style={{ 
-    borderTopWidth: '3px',
-    borderColor: '#d9d9d9'
-  }}
- >
-                                {`Additional Certificate ${index + 1}`}
+                      {/* Existing documents */}
+                      {existingDocs.length > 0 && (
+                        <div style={{ marginBottom: '16px' }}>
+                          {existingDocs.map((doc, idx) => (
+                            <Card key={doc.id || idx} size="small" style={{ marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <FileOutlined style={{ fontSize: '16px', color: '#1890ff' }} />
+                                  <div>
+                                    <div style={{ fontSize: '12px', fontWeight: '500' }}>
+                                      {doc.document_file?.original_name
+                                        ? doc.document_file.original_name.length > 15
+                                          ? doc.document_file.original_name.slice(0, 15) + '...'
+                                          : doc.document_file.original_name
+                                        : 'Document'}
+                                    </div>
+                                    {/* {doc.document_type && (
+                                      <div style={{ fontSize: '12px', color: '#1890ff' }}>{doc.document_type}</div>
+                                    )}
+                                    {doc.document_description && (
+                                      <div style={{ fontSize: '12px', color: '#666' }}>{doc.document_description}</div>
+                                    )} */}
+                                  </div>
+                                </div>
+                                <Space>
+                                  <Button type="link" icon={<EyeOutlined />} size="small"
+                                    onClick={() => viewDocument(doc.signed_url, doc.document_file?.original_name)}>
+                                    View
+                                  </Button>
+                                  <Button type="link" danger icon={<DeleteOutlined />} size="small"
+                                    onClick={() => handleDeleteDocument(doc.id, doc.document_file?.original_name)}>
+                                    Delete
+                                  </Button>
+                                </Space>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* New document upload fields */}
+                      {docFields.map((field, index) => {
+                        const docType = form.getFieldValue(['branch_documents', index, 'document_type']);
+                        const docDesc = form.getFieldValue(['branch_documents', index, 'document_description']);
+                        const isUploadDisabled = !field.file || !docType || docType.trim() === '' || !docDesc || docDesc.trim() === '';
+
+                        return (
+                          <div key={field.id} className="mb-3">
+                            {docFields.length > 1 && (
+                              <Divider orientation="center" style={{ borderTopWidth: '2px', borderColor: '#d9d9d9' }}>
+                                {`Document ${index + 1}`}
                               </Divider>
                             )}
 
-                            {/* Show existing additional document */}
-                            {existingAdditionalDocs[index] && renderExistingDocument(
-                              existingAdditionalDocs[index], 
-                              existingAdditionalDocs[index].file_name,
-                              false,
-                              index
-                            )}
-
-                            {/* File Upload */}
-                            <div className="col-md-6">
-                              <Form.Item
-                                label="File Upload"
-                              >
-                                <Space.Compact style={{ width: '100%', marginBottom: additionalSelectedFiles[index] ? '8px' : '0' }}>
-                                  <Upload
-                                    maxCount={1}
-                                    beforeUpload={(file) => {
-                                      const updatedSelected = [...additionalSelectedFiles];
-                                      updatedSelected[index] = file;
-                                      setAdditionalSelectedFiles(updatedSelected);
-                                      message.success(`${file.name} selected successfully`);
-                                      return false;
-                                    }}
-                                    accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx"
-                                    showUploadList={false}
-                                    fileList={[]}
-                                  >
-                                    <Button icon={<UploadOutlined />} style={{ width: '100%' }}>
-                                      Browse
-                                    </Button>
-                                  </Upload>
-                                  <Button 
-                                    icon={<CameraOutlined />}
-                                    onClick={() => openCamera(index, 'additional')}
-                                    title="Capture with Camera"
-                                  >
-                                    Camera
-                                  </Button>
-                                  <Button 
-                                    type="primary" 
-                                    icon={<UploadOutlined />}
-                                    onClick={() => {
-                                      if (additionalSelectedFiles[index] && additionalSelectedFiles[index] instanceof File) {
-                                        uploadFileManually(additionalSelectedFiles[index], true, index);
-                                      } else {
-                                        message.error('Please select a file first');
-                                      }
-                                    }}
-                                    disabled={!additionalSelectedFiles[index] || !(additionalSelectedFiles[index] instanceof File)}
-                                  >
-                                    Upload
-                                  </Button>
-                                </Space.Compact>
-                                
-                                {/* Show selected file with clear button - only if it's a File object (not uploaded yet) */}
-                                {additionalSelectedFiles[index] && additionalSelectedFiles[index] instanceof File && (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'space-between',
-                                    padding: '4px 11px',
-                                    border: '1px solid #d9d9d9',
-                                    borderRadius: '6px',
-                                    backgroundColor: '#f6ffed'
-                                  }}>
-                                    <div 
-                                      style={{ 
-                                        fontSize: '13px', 
-                                        color: '#52c41a', 
-                                        fontWeight: '500',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                        maxWidth: 'calc(100% - 30px)'
-                                      }}
-                                      title={additionalSelectedFiles[index].name}
+                            <div className="row">
+                              {/* File Upload */}
+                              <div className="col-md-4">
+                                <Form.Item label="File Upload" style={{ marginBottom: '8px' }}>
+                                  <Space.Compact style={{ width: '100%', marginBottom: field.file ? '8px' : '0' }}>
+                                    <Upload
+                                      maxCount={1}
+                                      multiple={false}
+                                      beforeUpload={(file) => handleFileSelect(file, field.id)}
+                                      accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx"
+                                      showUploadList={false}
+                                      fileList={[]}
                                     >
-                                      <FileOutlined style={{ marginRight: '5px' }} />
-                                      {additionalSelectedFiles[index].name}
-                                    </div>
-                                    <Button
-                                      icon={<CloseCircleOutlined />} 
-                                      onClick={() => {
-                                        const updatedSelected = [...additionalSelectedFiles];
-                                        updatedSelected[index] = null;
-                                        setAdditionalSelectedFiles(updatedSelected);
-                                        message.info('File selection cleared.');
-                                      }}
-                                      danger
-                                      type="text"
-                                      size="small"
-                                      title="Clear selected file"
-                                      style={{ 
-                                        padding: '0', 
-                                        height: 'auto',
-                                        marginLeft: '8px'
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                              </Form.Item>
-                            </div>
+                                      <Button icon={<UploadOutlined />} style={{ width: '100%', textAlign: 'left', paddingLeft: '12px' }}>
+                                        Browse
+                                      </Button>
+                                    </Upload>
+                                    <Button icon={<CameraOutlined />} onClick={() => openCamera(field.id)} title="Capture with Camera">
+                                      Camera
+                                    </Button>
+                                  </Space.Compact>
 
-                            {/* File Description + Buttons */}
-                            <div className="col-md-6">
-                              <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                                  {field.file && (
+                                    <div style={{
+                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                      padding: '4px 11px', border: '1px solid #d9d9d9',
+                                      borderRadius: '6px', backgroundColor: '#f6ffed',
+                                    }}>
+                                      <div style={{
+                                        fontSize: '13px', color: '#52c41a', fontWeight: '500',
+                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                        maxWidth: 'calc(100% - 30px)',
+                                      }} title={field.file.name}>
+                                        <FileOutlined style={{ marginRight: '5px' }} />
+                                        {field.file.name.length > 25 ? field.file.name.substring(0, 25) + '...' : field.file.name}
+                                      </div>
+                                      <Button
+                                        icon={<CloseCircleOutlined />}
+                                        onClick={() => handleClearFile(field.id)}
+                                        danger type="text" size="small"
+                                        style={{ padding: '0', height: 'auto', marginLeft: '8px' }}
+                                      />
+                                    </div>
+                                  )}
+                                </Form.Item>
+                              </div>
+
+                              {/* Document Type */}
+                              <div className="col-md-4">
                                 <Form.Item
-                                  {...restField}
-                                  name={[name, "additional_certifi_description"]}
+                                  label="Document Type"
+                                  name={['branch_documents', index, 'document_type']}
+                                  style={{ marginBottom: '8px' }}
                                   rules={[
-                                    { required: true, message: ERROR_MESSAGES.BRANCH.FILE_DESCRIPTION_REQUIRED },
-                                    { 
-                                      pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, 
-                                      message: 'Description must start with an alphabet and contain only alphabets and numbers' 
-                                    }
+                                    {
+                                      validator: (_, value) => {
+                                        if (field.file && (!value || value.trim() === '')) {
+                                          return Promise.reject('Please enter document type');
+                                        }
+                                        return Promise.resolve();
+                                      },
+                                    },
+                                    { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: 'Must start with an alphabet' },
                                   ]}
-                                  label="File Description"
-                                  style={{ flexGrow: 1 }}
                                 >
                                   <InputWithAddon
                                     icon={<FileTextOutlined />}
-                                    placeholder="Enter file description"
-                                     onValueFilter={(value) => {
-      if (value.length === 0) return '';
-      
-      // First character must be alphabet
-      let filtered = '';
-      for (let i = 0; i < value.length; i++) {
-        if (i === 0) {
-          if (/[A-Za-z]/.test(value[i])) {
-            filtered += value[i];
-          }
-        } else {
-          if (/[A-Za-z0-9\s]/.test(value[i])) {
-            filtered += value[i];
-          }
-        }
-      }
-      return filtered;
-    }}
+                                    placeholder="Enter document type"
+                                    onValueFilter={descriptionValueFilter}
+                                    onChange={() => setFormUpdateTrigger((t) => t + 1)}
                                   />
                                 </Form.Item>
-                                {/* Minus Button */}
-                                {index > 0 && (
-                                  <Button
-                                    type="primary"
-                                    danger
-                                    shape="circle"
-                                    icon={<MinusOutlined />}
-                                    onClick={() => {
-                                      remove(name);
-                                      setAdditionalFiles(prev => prev.filter((_, i) => i !== index));
-                                      setExistingAdditionalDocs(prev => prev.filter((_, i) => i !== index));
-                                      setAdditionalSelectedFiles(prev => prev.filter((_, i) => i !== index));
-                                    }}
-                                    style={{
-                                      width: 33,
-                                      height: 33,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      backgroundColor: "#ff4d4f",
-                                      borderColor: "#ff4d4f",
-                                      color: "#fff",
-                                      marginTop: "25px",
-                                    }}
+                              </div>
+
+                              {/* Document Description */}
+                              <div className="col-md-4">
+                                <Form.Item
+                                  label="Description"
+                                  name={['branch_documents', index, 'document_description']}
+                                  style={{ marginBottom: '8px' }}
+                                  rules={[
+                                    {
+                                      validator: (_, value) => {
+                                        if (field.file && (!value || value.trim() === '')) {
+                                          return Promise.reject('Enter description to upload the document');
+                                        }
+                                        return Promise.resolve();
+                                      },
+                                    },
+                                    { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: 'Must start with an alphabet' },
+                                  ]}
+                                >
+                                  <InputWithAddon
+                                    icon={<FileTextOutlined />}
+                                    placeholder="Enter description"
+                                    onValueFilter={descriptionValueFilter}
+                                    onChange={() => setFormUpdateTrigger((t) => t + 1)}
                                   />
-                                )}
+                                </Form.Item>
                               </div>
                             </div>
+
+                            {/* Plus / Minus buttons */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                              {index === docFields.length - 1 && (
+                                <Button
+                                  type="primary"
+                                  shape="circle"
+                                  icon={<PlusOutlined />}
+                                  onClick={addDocField}
+                                  style={{ width: 35, height: 35, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
+                                />
+                              )}
+                              {docFields.length > 1 && (
+                                <Button
+                                  type="primary"
+                                  danger
+                                  shape="circle"
+                                  icon={<MinusOutlined />}
+                                  onClick={() => removeDocField(field.id, index)}
+                                  style={{ width: 35, height: 35, backgroundColor: 'red', borderColor: 'red' }}
+                                />
+                              )}
+                            </div>
                           </div>
-                        ))}
+                        );
+                      })}
+                    </>
+                  )}
 
-                        {/* Add button */}
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                          <Button
-                            type="primary"
-                            shape="circle"
-                            icon={<PlusOutlined />}
-                            onClick={() => {
-                              add();
-                              setAdditionalFiles(prev => [...prev, null]);
-                              setAdditionalSelectedFiles(prev => [...prev, null]);
-                            }}
-                            style={{
-                              width: 35,
-                              height: 35,
-                              backgroundColor: "#28a745",
-                              borderColor: "#28a745",
-                              color: "#fff",
-                              marginTop: "-15px"
-                            }}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </Form.List>
-
-                  {/* Submit & Cancel Buttons */}
-                  <div className="text-center mt-4">
-                    <Space size="large">
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                      >
-                        {params.id ? "Update Branch" : "Add Branch"}
-                      </Button>
-                      <Button
-                        size="large"
-                        onClick={() => navigate("/branch/list")}
-                      >
-                        Cancel
-                      </Button>
-                    </Space>
+                  {/* ── Save / Cancel ─────────────────────────────────────── */}
+                  <div className="text-center mt-4" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                    <Button type="primary" size="large" onClick={handleSave} loading={loader}>
+                      {params.id ? 'Update Branch' : 'Save Branch'}
+                    </Button>
+                    <Button size="large" onClick={() => navigate('/branch/list')}>
+                      Cancel
+                    </Button>
                   </div>
+
                 </div>
               </Form>
             </div>
@@ -926,13 +642,12 @@ const AddBranch = () => {
         <ToastContainer />
       </div>
 
-      {/* Camera Capture Modal */}
+      {/* Camera */}
       <CameraCapture
         visible={cameraVisible}
         onClose={() => {
-          console.log('Camera modal closing');
           setCameraVisible(false);
-          cameraFieldRef.current = { fieldId: null, fieldType: null };
+          cameraFieldRef.current = { fieldId: null };
         }}
         onCapture={handleCameraCapture}
       />
@@ -942,16 +657,8 @@ const AddBranch = () => {
         open={previewVisible}
         title="Document Preview"
         footer={[
-          <Button key="close" onClick={() => setPreviewVisible(false)}>
-            Close
-          </Button>,
-          <Button 
-            key="download" 
-            type="primary"
-            onClick={() => window.open(previewContent, '_blank')}
-          >
-            Open in New Tab
-          </Button>
+          <Button key="close" onClick={() => setPreviewVisible(false)}>Close</Button>,
+          <Button key="open" type="primary" onClick={() => window.open(previewContent, '_blank')}>Open in New Tab</Button>,
         ]}
         onCancel={() => setPreviewVisible(false)}
         width={900}
@@ -961,29 +668,17 @@ const AddBranch = () => {
         style={{ top: 20 }}
       >
         <Spin spinning={previewLoading && previewType === 'image'}>
-          {previewType === 'pdf' && previewContent && (
-            <SecurePDFPreview url={previewContent} />
-          )}
-          
+          {previewType === 'pdf' && previewContent && <SecurePDFPreview url={previewContent} />}
           {previewType === 'image' && previewContent && (
             <div style={{ textAlign: 'center' }}>
-              <img 
-                src={previewContent} 
-                alt="Document Preview" 
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '70vh',
-                  objectFit: 'contain'
-                }}
+              <img
+                src={previewContent}
+                alt="Document Preview"
+                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
                 onLoad={() => setPreviewLoading(false)}
-                onError={(e) => {
-                  console.error('Image load error:', e);
+                onError={() => {
                   setPreviewLoading(false);
-                  notification.error({
-                    message: 'Error',
-                    description: 'Failed to load image',
-                    duration: 3,
-                  });
+                  notification.error({ message: 'Error', description: 'Failed to load image', duration: 3 });
                 }}
               />
             </div>

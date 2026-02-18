@@ -37,7 +37,7 @@ function ProfileMenu(props) {
   };
 
   const logout = () => {
-    localStorage.removeItem("access_token");
+    localStorage.clear();
     navigate('/login');
   };
 

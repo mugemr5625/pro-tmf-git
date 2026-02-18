@@ -1,4 +1,4 @@
-import { Button, Form, Input, Select, notification, Space } from "antd";
+import { Button, Form, Input, Select, notification, Space, Spin } from "antd";
 import Loader from "components/Common/Loader";
 import PAYMENT_MODES_OPTIONS from "constants/payment_modes";
 import { POST, PUT, GET } from "helpers/api_helper";
@@ -37,11 +37,17 @@ const AddInvestment = () => {
   const [investment, setInvestment] = useState(null);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
 
+  // ─── Loading states ───────────────────────────────────────────────────────
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [lineLoading, setLineLoading] = useState(false);
+  const [titleLoading, setTitleLoading] = useState(false);
+
   // ─── Fetch branch from localStorage + branch_dd ───────────────────────────
   const getBranchName = async () => {
+    setBranchLoading(true);
     try {
       const storedBranchId = localStorage.getItem("selected_branch_id");
-      if (!storedBranchId) return;
+      if (!storedBranchId) { setBranchLoading(false); return; }
 
       const response = await GET("api/branch_dd");
       if (response?.status === 200 && response?.data) {
@@ -50,17 +56,20 @@ const AddInvestment = () => {
           (branch) => branch.id === parseInt(storedBranchId)
         );
         if (matchedBranch) {
-          setSelectedBranchId(matchedBranch.id);
+          setSelectedBranchId(matchedBranch.id); // already an int from API
         }
       }
     } catch (error) {
       console.error("Error fetching branch data:", error);
       notification.error({ message: "Error", description: "Failed to fetch branch information." });
+    } finally {
+      setBranchLoading(false);
     }
   };
 
-  // ─── Fetch lines by branch_id (query param) ───────────────────────────────
+  // ─── Fetch lines by branch_id ─────────────────────────────────────────────
   const getLineList = async (branchId) => {
+    setLineLoading(true);
     try {
       const response = await GET(`api/line_dd/?branch_id=${branchId}`);
       if (response?.status === 200 && response?.data) {
@@ -71,11 +80,14 @@ const AddInvestment = () => {
     } catch (error) {
       console.error("Error fetching line data:", error);
       notification.error({ message: "Error", description: "Failed to fetch line information." });
+    } finally {
+      setLineLoading(false);
     }
   };
 
-  // ─── Fetch investment titles from /api/investmenttypes/ ───────────────────
+  // ─── Fetch investment titles ──────────────────────────────────────────────
   const getInvestmentTitles = async () => {
+    setTitleLoading(true);
     try {
       const response = await GET(INVESTMENT_TYPES_API);
       if (response?.status === 200) {
@@ -85,6 +97,8 @@ const AddInvestment = () => {
     } catch (error) {
       console.error("Error fetching investment titles:", error);
       notification.error({ message: "Error", description: "Failed to fetch investment titles." });
+    } finally {
+      setTitleLoading(false);
     }
   };
 
@@ -138,10 +152,9 @@ const AddInvestment = () => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      // Payload matches exactly: investment_title_id, branch, line, investment_amount, payment_mode, investment_date, comments
       const payload = {
         investment_title_id: values.investment_title_id,
-        branch: values.branch,
+        branch: selectedBranchId,
         line: values.line,
         investment_amount: values.investment_amount,
         payment_mode: values.payment_mode,
@@ -149,7 +162,6 @@ const AddInvestment = () => {
         comments: values.comments,
       };
 
-      // Get the investment title name for the success notification
       const titleObj = investmentTitles.find((t) => t.id === values.investment_title_id);
       const titleName = titleObj?.investment_title || "Investment";
 
@@ -189,13 +201,16 @@ const AddInvestment = () => {
     }
   };
 
-  // ─── Branch change → re-fetch lines ──────────────────────────────────────
-  const handleBranchChange = (branchId) => {
-    setSelectedBranchId(branchId);
-    form.setFieldsValue({ line: undefined });
-    setLineList([]);
-    if (branchId) getLineList(branchId);
-  };
+  // ─── Derived: branch display name ─────────────────────────────────────────
+  const branchDisplayName = branchLoading
+    ? "Loading..."
+    : branchList?.find((b) => b.id === selectedBranchId)?.branch_name || "No branch selected";
+
+  // ─── Derived: line field state ────────────────────────────────────────────
+  const isLineDisabled = branchLoading || lineLoading || !selectedBranchId;
+  const lineFieldIcon = branchLoading || lineLoading
+    ? <Spin size="small" />
+    : <ApartmentOutlined />;
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -222,6 +237,8 @@ const AddInvestment = () => {
 
                   {/* Row 1: Investment Title + Branch */}
                   <div className="row mb-2">
+
+                    {/* ── Investment Title ── */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Investment Title"
@@ -231,17 +248,17 @@ const AddInvestment = () => {
                         ]}
                       >
                         <SelectWithAddon
-                          icon={<DollarOutlined />}
-                          placeholder="Select Investment Title"
+                          icon={titleLoading ? <Spin size="small" /> : <DollarOutlined />}
+                          placeholder={titleLoading ? "Loading titles..." : "Select Investment Title"}
                           allowClear
                           showSearch
                           size="large"
+                          disabled={titleLoading}
                           filterOption={(input, option) =>
                             option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
                           }
                         >
                           {investmentTitles.map((title) => (
-                            // value = id (sent to backend), label = investment_title (shown to user)
                             <Option key={title.id} value={title.id}>
                               {title.investment_title}
                             </Option>
@@ -249,34 +266,43 @@ const AddInvestment = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
-                    <div className="col-md-6">
-                      <Form.Item
-                        label="Branch Name"
-                        name="branch"
-                        rules={[
-                          { required: true, message: ERROR_MESSAGES.INVESTMENT.BRANCH_REQUIRED },
-                        ]}
-                      >
-                        <SelectWithAddon
-                          icon={<BankOutlined />}
-                          placeholder="Select Branch"
-                          disabled={!!params.id}
-                          showSearch
-                          size="large"
-                          onChange={handleBranchChange}
-                        >
-                          {branchList?.map((branch) => (
-                            <Option key={branch.id} value={branch.id}>
-                              {branch.branch_name}
-                            </Option>
-                          ))}
-                        </SelectWithAddon>
-                      </Form.Item>
-                    </div>
+
+                    {/* ── Branch — preselected, read-only ── */}
+                    {/* ── Branch — preselected, read-only ── */}
+<div className="col-md-6">
+  {/* Hidden field keeps the branch ID in the form store for validation */}
+  <Form.Item
+    name="branch"
+    rules={[
+      { required: true, message: ERROR_MESSAGES.INVESTMENT.BRANCH_REQUIRED },
+    ]}
+    style={{ display: "none" }}
+  >
+    <Input type="hidden" />
+  </Form.Item>
+
+  {/* Visual display — NOT controlled by Form, so branchDisplayName always wins */}
+  <Form.Item label="Branch Name">
+    <InputWithAddon
+      icon={branchLoading ? <Spin size="small" /> : <BankOutlined />}
+      value={branchDisplayName}
+      placeholder="No branch selected"
+      disabled
+      style={{
+        backgroundColor: '#f5f5f5',
+        cursor: 'not-allowed',
+        color: branchLoading ? '#999' : '#000',
+      }}
+    />
+  </Form.Item>
+</div>
+
                   </div>
 
                   {/* Row 2: Line + Investment Amount */}
                   <div className="row mb-2">
+
+                    {/* ── Line ── */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Line Name"
@@ -286,12 +312,20 @@ const AddInvestment = () => {
                         ]}
                       >
                         <SelectWithAddon
-                          icon={<ApartmentOutlined />}
-                          placeholder={selectedBranchId ? "Select Line" : "First select a branch"}
+                          icon={lineFieldIcon}
+                          placeholder={
+                            branchLoading
+                              ? "Loading branch..."
+                              : lineLoading
+                              ? "Loading lines..."
+                              : !selectedBranchId
+                              ? "Select a branch first"
+                              : "Select Line"
+                          }
                           allowClear
                           showSearch
                           size="large"
-                          disabled={!selectedBranchId}
+                          disabled={isLineDisabled}
                           filterOption={(input, option) =>
                             option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
                           }
@@ -304,6 +338,8 @@ const AddInvestment = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
+
+                    {/* ── Investment Amount ── */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Investment Amount"
@@ -327,19 +363,19 @@ const AddInvestment = () => {
                         />
                       </Form.Item>
                     </div>
+
                   </div>
 
                   {/* Row 3: Payment Mode + Date */}
                   <div className="row mb-2">
+
+                    {/* ── Payment Mode ── */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Payment Mode"
                         name="payment_mode"
                         rules={[
-                          {
-                            required: true,
-                            message: ERROR_MESSAGES.INVESTMENT.PAYMENT_MODE_REQUIRED,
-                          },
+                          { required: true, message: ERROR_MESSAGES.INVESTMENT.PAYMENT_MODE_REQUIRED },
                         ]}
                       >
                         <SelectWithAddon
@@ -356,6 +392,8 @@ const AddInvestment = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
+
+                    {/* ── Date ── */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Date of Investment"
@@ -378,6 +416,7 @@ const AddInvestment = () => {
                         />
                       </Form.Item>
                     </div>
+
                   </div>
 
                   {/* Row 4: Comments */}

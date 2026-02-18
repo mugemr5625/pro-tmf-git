@@ -29,38 +29,75 @@ const BLOCKED_MIME_TYPES = [
 const isUrlSafe = (url) => {
   try {
     const urlObj = new URL(url);
-    
+
     // Only allow HTTPS
     if (urlObj.protocol !== 'https:') {
       return { safe: false, reason: 'Only HTTPS URLs are allowed' };
     }
-    
+
     // Check against allowlist
-    const isAllowed = ALLOWED_DOMAINS.some(domain => 
+    const isAllowed = ALLOWED_DOMAINS.some(domain =>
       urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`)
     );
-    
+
     if (!isAllowed) {
       return { safe: false, reason: 'URL not from trusted domain' };
     }
-    
-    // Check for Google Cloud Storage signed URL signature
+
     if (urlObj.hostname.includes('googleapis.com')) {
-      const hasRequiredParams = urlObj.searchParams.has('Expires') && 
-                                urlObj.searchParams.has('GoogleAccessId') && 
-                                urlObj.searchParams.has('Signature');
-      if (!hasRequiredParams) {
+      
+      // ✅ V4 signed URL (GOOG4-RSA-SHA256) — what your API returns
+      const isV4 =
+        urlObj.searchParams.has('X-Goog-Algorithm') &&
+        urlObj.searchParams.has('X-Goog-Credential') &&
+        urlObj.searchParams.has('X-Goog-Signature') &&
+        urlObj.searchParams.has('X-Goog-Date') &&
+        urlObj.searchParams.has('X-Goog-Expires');
+
+      // ✅ V2 signed URL (legacy)
+      const isV2 =
+        urlObj.searchParams.has('Expires') &&
+        urlObj.searchParams.has('GoogleAccessId') &&
+        urlObj.searchParams.has('Signature');
+
+      if (!isV4 && !isV2) {
         return { safe: false, reason: 'Invalid signed URL format' };
       }
-      
-      // Check expiration
-      const expires = parseInt(urlObj.searchParams.get('Expires'));
-      const now = Math.floor(Date.now() / 1000);
-      if (expires < now) {
-        return { safe: false, reason: 'Signed URL has expired' };
+
+      // Check expiration for V4
+      if (isV4) {
+        const googleDate = urlObj.searchParams.get('X-Goog-Date'); // e.g. 20260218T085234Z
+        const expiresSeconds = parseInt(urlObj.searchParams.get('X-Goog-Expires')); // e.g. 3600
+
+        if (googleDate && !isNaN(expiresSeconds)) {
+          // Parse YYYYMMDDTHHMMSSZ format
+          const year   = parseInt(googleDate.slice(0, 4));
+          const month  = parseInt(googleDate.slice(4, 6)) - 1;
+          const day    = parseInt(googleDate.slice(6, 8));
+          const hour   = parseInt(googleDate.slice(9, 11));
+          const minute = parseInt(googleDate.slice(11, 13));
+          const second = parseInt(googleDate.slice(13, 15));
+
+          const issuedAt = Date.UTC(year, month, day, hour, minute, second);
+          const expiresAt = issuedAt + expiresSeconds * 1000;
+          const now = Date.now();
+
+          if (now > expiresAt) {
+            return { safe: false, reason: 'Signed URL has expired' };
+          }
+        }
+      }
+
+      // Check expiration for V2
+      if (isV2) {
+        const expires = parseInt(urlObj.searchParams.get('Expires'));
+        const now = Math.floor(Date.now() / 1000);
+        if (expires < now) {
+          return { safe: false, reason: 'Signed URL has expired' };
+        }
       }
     }
-    
+
     return { safe: true };
   } catch (e) {
     return { safe: false, reason: 'Invalid URL format' };
@@ -256,7 +293,7 @@ const SecurePDFPreview = ({ url }) => {
 };
 
 // ========== MAIN COMPONENT ==========
-const BranchCollapseContent = ({ branch, details }) => {
+const BranchCollapseContent = ({ branch, details, documents = [], documentsLoading = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileType, setFileType] = useState("");
@@ -454,7 +491,7 @@ const BranchCollapseContent = ({ branch, details }) => {
             {branch.branch_address}
           </Descriptions.Item>
 
-          {(agreementCerts.length > 0 || additionalCerts.length > 0) && (
+          {/* {(agreementCerts.length > 0 || additionalCerts.length > 0) && (
             <>
               {agreementCerts.map((cert, index) => {
                 const iconUrl = getFileIcon(cert.signed_url);
@@ -518,7 +555,45 @@ const BranchCollapseContent = ({ branch, details }) => {
                 );
               })}
             </>
-          )}
+          )} */}
+          {documentsLoading && (
+  <Descriptions.Item label="Documents" span={3}>
+    <Spin size="small" tip="Loading documents..." />
+  </Descriptions.Item>
+)}
+
+{!documentsLoading && documents.length > 0 &&
+  documents.map((doc, index) => {
+    const iconUrl = getFileIcon(doc.signed_url);
+    return (
+      <Descriptions.Item
+        key={`branch-doc-${doc.id}`}
+        label={doc.document_type || `Document ${index + 1}`}
+        span={1}
+      >
+        <div className="file-item-container">
+          <img src={iconUrl} alt="File Icon" width={20} height={20} />
+          <span
+            onClick={() => handleOpenFile(doc.signed_url)}
+            className="file-link"
+            title={doc.document_description}
+            role="button"
+            tabIndex={0}
+            onKeyPress={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleOpenFile(doc.signed_url);
+              }
+            }}
+            style={{ cursor: "pointer" }}
+          >
+            {truncateText(doc.document_description)}
+          </span>
+        </div>
+      </Descriptions.Item>
+    );
+  })
+}
         </Descriptions>
 
         {verificationError && (

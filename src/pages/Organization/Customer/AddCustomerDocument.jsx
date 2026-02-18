@@ -30,12 +30,23 @@ const AddCustomerDocument = ({ customerId,customerName, onPrevious, onCancel }) 
 
   const navigate = useNavigate();
 
-  useEffect(() => {
+useEffect(() => {
     if (customerId) {
-      form.setFieldsValue({ customer_name: customerName });
+      fetchCustomerName();
       fetchExistingDocuments();
     }
   }, [customerId, form]);
+
+  const fetchCustomerName = async () => {
+    try {
+      const response = await GET(`/api/customers/${customerId}/`);
+      if (response?.status === 200 && response?.data?.customer_name) {
+        form.setFieldsValue({ customer_name: response.data.customer_name });
+      }
+    } catch (error) {
+      console.error('Failed to fetch customer name:', error);
+    }
+  };
 
   const openCamera = (fieldId, fieldType) => {
     cameraFieldRef.current = { fieldId, fieldType };
@@ -154,7 +165,7 @@ const initializeFieldsFromDocuments = (documents) => {
 const fetchExistingDocuments = async () => {
   setLoadingDocuments(true);
   try {
-    const response = await GET(`/api/customer-documents/customer/${customerId}/documents/`);
+    const response = await GET(`/api/customer-documents/?customer_id=${customerId}`);
     
     if (response && response.error) {
       setExistingDocuments([]);
@@ -235,15 +246,31 @@ const handleDeleteDocument = async (docId, fileName) => {
     onOk: async () => {
       setLoadingDocuments(true);
       try {
-        const response = await DELETE(`/api/customer-documents/${docId}/`);
-
-        if (response?.status === 204 || response?.status === 200) {
+       const response = await DELETE(`/api/customer-documents/${docId}/?customer_id=${customerId}`);
+if (response?.status === 204 || response?.status === 200) {
           notification.success({
             message: 'Deleted',
             description: `${fileName || 'Document'} deleted successfully.`,
             duration: 3,
           });
-          
+
+          // Find the deleted document to get its type and index
+          const deletedDoc = existingDocuments.find(doc => doc.id === docId);
+          if (deletedDoc) {
+            const docsOfSameType = existingDocuments.filter(doc => doc.document_type === deletedDoc.document_type);
+            const deletedIndex = docsOfSameType.findIndex(doc => doc.id === docId);
+            const prefixMap = {
+              aadhaar: 'aadhaar_description',
+              pan: 'pan_description',
+              location_photo: 'location_description',
+              other: 'other_description',
+            };
+            const prefix = prefixMap[deletedDoc.document_type];
+            if (prefix && deletedIndex !== -1) {
+              form.setFieldValue(`${prefix}_${deletedIndex}`, '');
+            }
+          }
+
           // Update existing documents list
           const updatedDocs = existingDocuments.filter(doc => doc.id !== docId);
           setExistingDocuments(updatedDocs);
@@ -549,12 +576,11 @@ const addOtherField = () => {
 
     try {
       const formData = new FormData();
-      formData.append('customer_id', String(customerId));
       formData.append('document_type', type);
       formData.append('document_description', description);
       formData.append('document_file', file, file.name);
 
-      const response = await UPLOAD('/api/customer-documents/', formData);
+      const response = await UPLOAD(`/api/customer-documents/?customer_id=${customerId}`, formData);
 
       const resetFields = fields.map(field => 
         field.id === fieldId ? { ...field, loading: false } : field
@@ -707,14 +733,19 @@ const isUploadDisabled = !field.file || !currentDescription || currentDescriptio
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <FileOutlined style={{ fontSize: '16px', color: '#1890ff' }} />
                         <div>
-                          <div style={{ fontSize: '12px', fontWeight: '500' }}>
-                            {existingDoc.document_file?.original_name || 'Document'}
-                          </div>
-                          {existingDoc.document_description && (
+                        <div style={{ fontSize: '12px', fontWeight: '500' }}>
+  {existingDoc.document_file?.original_name
+    ? existingDoc.document_file.original_name.length > 15
+      ? existingDoc.document_file.original_name.slice(0, 15) + '...'
+      : existingDoc.document_file.original_name
+    : 'Document'}
+</div>
+
+                          {/* {existingDoc.document_description && (
                             <div style={{ fontSize: '12px', color: '#666' }}>
                               {existingDoc.document_description}
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </div>
                       <Space>
@@ -1141,4 +1172,4 @@ const isUploadDisabled = !field.file || !currentDescription || currentDescriptio
   );
 };
 
-export default AddCustomerDocument;
+export default AddCustomerDocument; 

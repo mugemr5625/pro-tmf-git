@@ -583,10 +583,10 @@ const ListUser = () => {
     setSelectedLine(null);
     setSearchText("");
 
-    notification.success({
-      message: "Data Reset",
-      description: "Restored to the original view successfully.",
-    });
+    // notification.success({
+    //   message: "Data Reset",
+    //   description: "Restored to the original view successfully.",
+    // });
   };
 
   const handleSearch = () => {
@@ -630,12 +630,13 @@ const ListUser = () => {
         message: "No Results",
         description: `No matches found for "${searchText}".`,
       });
-    } else {
-      notification.success({
-        message: "Search Complete",
-        description: `${filtered.length} result(s) found for "${searchText}".`,
-      });
-    }
+    } 
+    // else {
+    //   notification.success({
+    //     message: "Search Complete",
+    //     description: `${filtered.length} result(s) found for "${searchText}".`,
+    //   });
+    // }
   };
 
   const searchModal = (

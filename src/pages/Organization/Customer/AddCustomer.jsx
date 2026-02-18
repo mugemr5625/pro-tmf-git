@@ -53,7 +53,7 @@ const AddCustomer = () => {
     const [form] = Form.useForm();
     const params = useParams();
     const navigate = useNavigate();
-
+const [isScrolled, setIsScrolled] = useState(false);
     // Helper function to parse location string
     const parseLocation = (locationString) => {
         if (!locationString) return null;
@@ -79,7 +79,13 @@ const AddCustomer = () => {
         }
         return () => clearInterval(interval);
     }, [isGettingLocation]);
-
+useEffect(() => {
+    const handleScroll = () => {
+        setIsScrolled(window.scrollY > 80);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+}, []);
 const getAreaList = useCallback(async () => {
     try {
         setLoader(true);
@@ -93,7 +99,7 @@ const getAreaList = useCallback(async () => {
             data.forEach(item => {
                 if (item.branch && !branchMap.has(item.branch)) {
                     branchMap.set(item.branch, {
-                        id: item.branch,  // ✅ Use 'branch' field, not 'branch_id'
+                        id: item.branch,
                         branch_name: item.branch_name
                     });
                 }
@@ -105,9 +111,9 @@ const getAreaList = useCallback(async () => {
             data.forEach(item => {
                 if (item.line && !lineMap.has(item.line)) {
                     lineMap.set(item.line, {
-                        id: item.line,  // ✅ Use 'line' field, not 'line_id'
+                        id: item.line,
                         name: item.line_name,
-                        branch_id: item.branch  // ✅ Use 'branch' field
+                        branch_id: item.branch
                     });
                 }
             });
@@ -120,8 +126,8 @@ const getAreaList = useCallback(async () => {
                     areaMap.set(item.id, {
                         id: item.id,
                         name: item.areaName,
-                        branch_id: item.branch,  // ✅ Use 'branch' field
-                        line_id: item.line       // ✅ Use 'line' field
+                        branch_id: item.branch,
+                        line_id: item.line
                     });
                 }
             });
@@ -133,74 +139,41 @@ const getAreaList = useCallback(async () => {
             setFilteredLineList(uniqueLines);
             setFilteredAreaList(uniqueAreas);
 
-            // Check for saved selections in localStorage
-            const storedLineName = localStorage.getItem('selected_line_name');
-            const storedAreaId = localStorage.getItem('selected_area_id');
-            const storedAreaName = localStorage.getItem('selected_area_name');
-            const storedBranchName = localStorage.getItem('selected_branch_name');
+            // ── Read IDs directly from localStorage — no name-matching needed ──
+            const storedBranchId = localStorage.getItem("selected_branch_id");
+            const storedLineId   = localStorage.getItem("selected_line_id");
+            const storedAreaId   = localStorage.getItem("selected_area_id");
+            const storedLineName = localStorage.getItem("selected_line_name");
+            const storedAreaName = localStorage.getItem("selected_area_name");
 
-            if (storedLineName && storedAreaId && storedBranchName && !params.id) {
-                // Parse storedBranchName if it's JSON
-                let branchName = storedBranchName;
-                try {
-                    const parsedBranch = JSON.parse(storedBranchName);
-                    branchName = parsedBranch.branch_name || parsedBranch.name || parsedBranch;
-                } catch (e) {
-                    branchName = storedBranchName;
-                }
+            if (storedBranchId && storedLineId && storedAreaId && !params.id) {
+                const branchId = parseInt(storedBranchId);
+                const lineId   = parseInt(storedLineId);
+                const areaId   = parseInt(storedAreaId);
 
-                // Set saved values for display
-                setSavedBranchName(branchName);
-                setSavedLineName(storedLineName);
-                setSavedAreaId(parseInt(storedAreaId));
-                setSavedAreaName(storedAreaName);
+                // Find branch name for the read-only display field
+                const matchedBranch = uniqueBranches.find(b => b.id === branchId);
+                setSavedBranchName(matchedBranch?.branch_name || String(branchId));
+                setSavedLineName(storedLineName || String(lineId));
+                setSavedAreaId(areaId);
+                setSavedAreaName(storedAreaName || String(areaId));
                 setIsFromLocalStorage(true);
 
-                // Find the branch ID from branch name
-                const matchedBranch = uniqueBranches.find(
-                    branch => branch.branch_name === branchName
+                // Set form values directly using IDs — no name lookup required
+                form.setFieldsValue({
+                    branch: branchId,
+                    line: lineId,
+                    area: areaId,
+                });
+
+                // Filter dropdowns to reflect the saved selection
+                const filteredLines = uniqueLines.filter(l => l.branch_id === branchId);
+                setFilteredLineList(filteredLines);
+
+                const filteredAreas = uniqueAreas.filter(
+                    a => a.branch_id === branchId && a.line_id === lineId
                 );
-
-                // Find the line ID from line name
-                const matchedLine = uniqueLines.find(
-                    line => line.name === storedLineName &&
-                        line.branch_id === matchedBranch?.id
-                );
-
-                if (matchedBranch && matchedLine) {
-                    // ✅ Set form values with actual IDs
-                    form.setFieldsValue({
-                        branch: matchedBranch.id,
-                        line: matchedLine.id,
-                        area: parseInt(storedAreaId)
-                    });
-
-                    // Filter line and area lists
-                    const filteredLines = uniqueLines.filter(
-                        line => line.branch_id === matchedBranch.id
-                    );
-                    setFilteredLineList(filteredLines);
-
-                    const filteredAreas = uniqueAreas.filter(
-                        area => area.branch_id === matchedBranch.id &&
-                            area.line_id === matchedLine.id
-                    );
-                    setFilteredAreaList(filteredAreas);
-
-                    // ✅ Debug log to verify
-                    console.log('Form values set:', {
-                        branch: matchedBranch.id,
-                        line: matchedLine.id,
-                        area: parseInt(storedAreaId)
-                    });
-                } else {
-                    console.error('Could not match branch or line:', {
-                        matchedBranch,
-                        matchedLine,
-                        branchName,
-                        storedLineName
-                    });
-                }
+                setFilteredAreaList(filteredAreas);
             }
         }
         setLoader(false);
@@ -728,17 +701,26 @@ const handleLineChange = (lineId) => {
     rules={[
         { required: true, message: 'Please enter customer name' },
         { min: 2, message: 'Name must be at least 2 characters' },
-        { pattern: /^[A-Za-z\s]+$/, message: 'Must contain only alphabets' }
+        {
+            pattern: /^[A-Za-z][A-Za-z0-9\- ]*$/,
+            message: 'First character must be a letter; letters, numbers, hyphens and spaces allowed',
+        },
     ]}
 >
     <InputWithAddon
         icon={<UserOutlined />}
         placeholder="Enter customer name"
-        onKeyPress={(e) => {
-            // Prevent numbers and special characters
-            if (!/[A-Za-z\s]/.test(e.key)) {
-                e.preventDefault();
+        onValueFilter={(value) => {
+            if (!value) return "";
+            let filtered = "";
+            for (let i = 0; i < value.length; i++) {
+                if (i === 0) {
+                    if (/[A-Za-z]/.test(value[i])) filtered += value[i];
+                } else {
+                    if (/[A-Za-z0-9\- ]/.test(value[i])) filtered += value[i];
+                }
             }
+            return filtered;
         }}
     />
 </Form.Item>
@@ -1414,6 +1396,7 @@ const handleLineChange = (lineId) => {
                     </div>
                 </div>
             </div>
+            
         </>
     );
 };

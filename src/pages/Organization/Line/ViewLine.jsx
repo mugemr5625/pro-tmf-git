@@ -160,10 +160,10 @@ const ViewLine = () => {
     setSelectedBranch(null);
     setSearchText("");
 
-    notification.success({
-      message: "Data Reset",
-      description: "Restored to the original view successfully.",
-    });
+    // notification.success({
+    //   message: "Data Reset",
+    //   description: "Restored to the original view successfully.",
+    // });
   };
 
  const clickReorder = () => {
@@ -257,7 +257,7 @@ const SumbitReorder = async () => {
     
     console.log("Sending reordered line IDs:", payload);
     
-    const response = await POST(`${LINE}reorder/`, payload);
+    const response = await POST(`api/lines-reorder/`, payload);
     
     if (response?.status === 200) {
       const storedBranchName = localStorage.getItem("selected_branch_name");
@@ -596,12 +596,13 @@ const SumbitReorder = async () => {
         message: "No Results",
         description: `No matches found for "${searchText}".`,
       });
-    } else {
-      notification.success({
-        message: "Search Complete",
-        description: `${filtered.length} result(s) found for "${searchText}".`,
-      });
     }
+    //  else {
+    //   notification.success({
+    //     message: "Search Complete",
+    //     description: `${filtered.length} result(s) found for "${searchText}".`,
+    //   });
+    // }
   };
 
   const searchModal = (

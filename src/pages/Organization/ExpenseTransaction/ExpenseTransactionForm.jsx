@@ -192,24 +192,23 @@ const ExpenseTransactionForm = () => {
     }
   };
 
-  const onValuesChange = (changedValues) => {
-    if (changedValues.branch_id !== undefined) {
-      setSelectedBranchId(changedValues.branch_id);
-      
-      // Filter lines based on selected branch
-      if (changedValues.branch_id && allLines.length > 0) {
-        const branchLines = allLines.filter(
-          line => line.branch_id === changedValues.branch_id
-        );
-        setFilteredLines(branchLines);
-      } else {
-        setFilteredLines([]);
-      }
-      
-      // Reset line selection when branch changes
-      form.setFieldsValue({ line_id: undefined });
+ const onValuesChange = (changedValues) => {
+  if ('branch_id' in changedValues) {          // ← key check instead of value check
+    const newBranchId = changedValues.branch_id ?? null;
+    setSelectedBranchId(newBranchId);
+
+    if (newBranchId && allLines.length > 0) {
+      const branchLines = allLines.filter(
+        (line) => line.branch_id === newBranchId
+      );
+      setFilteredLines(branchLines);
+    } else {
+      setFilteredLines([]);                    // ← clears lines when branch removed
     }
-  };
+
+    form.setFieldsValue({ line_id: undefined }); // ← resets line selection
+  }
+};
 
   return (
     <>
@@ -243,26 +242,23 @@ const ExpenseTransactionForm = () => {
                           { required: true, message: "Please select a branch" },
                         ]}
                       >
-                        <SelectWithAddon
-                          icon={<BankOutlined />}
-                          placeholder="Select Branch"
-                          allowClear
-                          showSearch
-                          size="large"
-                          loading={branchLoader}
-                          notFoundContent={
-                            branchLoader ? <Spin size="small" /> : "No branches found"
-                          }
-                          filterOption={(input, option) =>
-                            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                          }
-                        >
-                          {branchList.map((branch) => (
-                            <Option key={branch.id} value={branch.id}>
-                              {branch.branch_name}
-                            </Option>
-                          ))}
-                        </SelectWithAddon>
+                       <SelectWithAddon
+  icon={branchLoader ? <Spin size="small" /> : <BankOutlined />}
+  placeholder={branchLoader ? "Loading branches..." : "Select Branch"}
+  allowClear
+  showSearch
+  size="large"
+  disabled={branchLoader}
+  filterOption={(input, option) =>
+    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+  }
+>
+  {branchList.map((branch) => (
+    <Option key={branch.id} value={branch.id}>
+      {branch.branch_name}
+    </Option>
+  ))}
+</SelectWithAddon>
                       </Form.Item>
                     </div>
 
@@ -274,27 +270,36 @@ const ExpenseTransactionForm = () => {
                           { required: true, message: "Please select a line" },
                         ]}
                       >
-                        <SelectWithAddon
-                          icon={<ApartmentOutlined />}
-                          placeholder={selectedBranchId ? "Select Line" : "First select a branch"}
-                          allowClear
-                          showSearch
-                          size="large"
-                          disabled={!selectedBranchId}
-                          loading={lineLoader}
-                          notFoundContent={
-                            lineLoader ? <Spin size="small" /> : "No lines found"
-                          }
-                          filterOption={(input, option) =>
-                            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                          }
-                        >
-                          {filteredLines.map((line) => (
-                            <Option key={line.line_id} value={line.line_id}>
-                              {line.line_name}
-                            </Option>
-                          ))}
-                        </SelectWithAddon>
+                       <SelectWithAddon
+  icon={lineLoader ? <Spin size="small" /> : <ApartmentOutlined />}
+  placeholder={
+    branchLoader
+      ? "Loading branches..."
+      : lineLoader
+      ? "Loading lines..."
+      : !selectedBranchId
+      ? "Select a branch first"
+      : "Select Line"
+  }
+  allowClear
+  showSearch
+  size="large"
+  disabled={!selectedBranchId || lineLoader}
+  style={{
+    backgroundColor: (!selectedBranchId || lineLoader) ? '#f5f5f5' : undefined,
+    cursor: (!selectedBranchId || lineLoader) ? 'not-allowed' : undefined,
+    opacity: 1,
+  }}
+  filterOption={(input, option) =>
+    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+  }
+>
+  {filteredLines.map((line) => (
+    <Option key={line.line_id} value={line.line_id}>
+      {line.line_name}
+    </Option>
+  ))}
+</SelectWithAddon>
                       </Form.Item>
                     </div>
                   </div>
@@ -313,25 +318,22 @@ const ExpenseTransactionForm = () => {
                         ]}
                       >
                         <SelectWithAddon
-                          icon={<FileTextOutlined />}
-                          placeholder="Select Expense Type"
-                          allowClear
-                          showSearch
-                          size="large"
-                          loading={expenseTypeLoader}
-                          notFoundContent={
-                            expenseTypeLoader ? <Spin size="small" /> : "No expense types found"
-                          }
-                          filterOption={(input, option) =>
-                            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                          }
-                        >
-                          {expenseTypeList?.map((type) => (
-                            <Option key={type.id} value={type.id}>
-                              {type.name}
-                            </Option>
-                          ))}
-                        </SelectWithAddon>
+  icon={expenseTypeLoader ? <Spin size="small" /> : <FileTextOutlined />}
+  placeholder={expenseTypeLoader ? "Loading expense types..." : "Select Expense Type"}
+  allowClear
+  showSearch
+  size="large"
+  disabled={expenseTypeLoader}
+  filterOption={(input, option) =>
+    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+  }
+>
+  {expenseTypeList?.map((type) => (
+    <Option key={type.id} value={type.id}>
+      {type.name}
+    </Option>
+  ))}
+</SelectWithAddon>
                       </Form.Item>
                     </div>
 

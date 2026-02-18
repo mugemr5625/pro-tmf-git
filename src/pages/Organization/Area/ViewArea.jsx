@@ -62,9 +62,10 @@ const ViewArea = () => {
   const [areasPagination, setAreasPagination] = useState({});
   const [lineSelectionModalVisible, setLineSelectionModalVisible] = useState(false);
   const [tempSelectedLine, setTempSelectedLine] = useState(null);
+  const [originalOrder, setOriginalOrder] = useState([]); // Track original order for diff
   const AREAS_PAGE_SIZE = 10;
-const MAX_VISIBLE_ITEMS = 8;
-const ITEM_HEIGHT = 20; 
+  const MAX_VISIBLE_ITEMS = 8;
+  const ITEM_HEIGHT = 20;
 
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
@@ -134,10 +135,10 @@ const ITEM_HEIGHT = 20;
 
   const handleReset = () => {
     const storedBranchName = localStorage.getItem("selected_branch_name");
-    const branchFilteredData = storedBranchName 
+    const branchFilteredData = storedBranchName
       ? originalData.filter(item => item.branch_name === storedBranchName)
       : originalData;
-    
+
     const grouped = groupAreasByLine(branchFilteredData);
     const newPagination = {};
     Object.keys(grouped).forEach(lineName => {
@@ -155,40 +156,70 @@ const ITEM_HEIGHT = 20;
     setSearchText("");
   };
 
+  // Get only the items whose position has changed
+  const getReorderedItems = (currentData) => {
+    const reorderedItems = [];
+
+    currentData.forEach((item, newIndex) => {
+      const originalItem = originalOrder.find(orig => orig.id === item.id);
+
+      if (originalItem && originalItem.originalIndex !== newIndex) {
+        reorderedItems.push({
+          id: item.id,
+          newOrder: newIndex + 1,
+          oldOrder: originalItem.originalIndex + 1,
+        });
+      }
+    });
+
+    return reorderedItems;
+  };
+
   const SumbitReorder = async () => {
     try {
-      if (!selectedLine) {
-        notification.error({
-          message: "Error",
-          description: "No line selected for reordering.",
+      setReorderLoader(true);
+
+      // Get current order (either from drag-drop or manual reorder)
+      const reorderedData = Object.keys(order)?.length > 0 ? sortData(order) : tableData;
+
+      // Get only the items that were reordered
+      const reorderedItems = getReorderedItems(reorderedData);
+
+      if (reorderedItems.length === 0) {
+        notification.info({
+          message: "No Changes",
+          description: "No areas were reordered.",
         });
+        setReorderLoader(false);
         return;
       }
 
-      setReorderLoader(true);
+      // Send only IDs of reordered items
+      const payload = {
+        ordered_ids: reorderedItems.map(item => item.id)
+      };
 
-      const reorderedData = Object.keys(order)?.length > 0 ? sortData(order) : tableData;
-      const lineOriginalAreas = originalData.filter(item => item.line_name === selectedLine);
-      const lineOriginalAreaIds = new Set(lineOriginalAreas.map(item => item.id));
-      const reorderedLineAreas = reorderedData.filter(item => lineOriginalAreaIds.has(item.id));
-
-      const apiPayload = reorderedLineAreas.map((item, index) => ({
-        ...item,
-        order: index + 1,
-      }));
-
-      const response = await POST(`${AREA}reorder/`, apiPayload);
+      const response = await POST(`api/areas-reorder/`, payload);
 
       if (response?.status === 200) {
-        const updatedOriginalData = originalData.filter(item => item.line_name !== selectedLine);
-        const finalOriginalData = [...updatedOriginalData, ...reorderedLineAreas];
-
         const storedBranchName = localStorage.getItem("selected_branch_name");
-        let finalData = finalOriginalData.filter(
-          (item) => item.branch_name === storedBranchName
-        );
 
-        setOriginalData(finalOriginalData);
+        // Update originalData with the new reordered structure
+        const reorderedIds = new Set(reorderedData.map(item => item.id));
+
+        const updatedOriginalData = [
+          ...originalData.filter(item => !reorderedIds.has(item.id)),
+          ...reorderedData
+        ];
+
+        let finalData = updatedOriginalData;
+        if (storedBranchName) {
+          finalData = updatedOriginalData.filter(
+            (item) => item.branch_name === storedBranchName
+          );
+        }
+
+        setOriginalData(updatedOriginalData);
         setTableData(finalData);
         const grouped = groupAreasByLine(finalData);
         setGroupedData(grouped);
@@ -209,6 +240,7 @@ const ITEM_HEIGHT = 20;
         );
         setTableHeader(filtered);
         setOrder({});
+        setOriginalOrder([]); // Clear original order
         setSelectedLine(null);
         setShowReset(false);
         setSearchText("");
@@ -217,8 +249,8 @@ const ITEM_HEIGHT = 20;
 
         notification.success({
           message: "Re-Ordered",
-          description: `The order for line "${selectedLine}" has been updated successfully.`,
-          duration: 0,
+          description: `Successfully reordered ${reorderedItems.length} area(s).`,
+          duration: 3,
         });
       } else {
         notification.error({
@@ -256,6 +288,12 @@ const ITEM_HEIGHT = 20;
 
     setSelectedLine(lineName);
     setTableData(filteredData);
+
+    // Store original order with IDs and their positions
+    setOriginalOrder(filteredData.map((item, index) => ({
+      id: item.id,
+      originalIndex: index,
+    })));
 
     setTableHeader((prev) => {
       const baseHeaders = prev.filter(item => !["move", "order"].includes(item.value));
@@ -321,6 +359,7 @@ const ITEM_HEIGHT = 20;
     setReorder(false);
     setSelectedLine(null);
     setTempSelectedLine(null);
+    setOriginalOrder([]); // Clear original order
 
     const storedBranchName = localStorage.getItem("selected_branch_name");
     if (storedBranchName) {
@@ -534,7 +573,7 @@ const ITEM_HEIGHT = 20;
     const query = searchText.trim().toLowerCase();
     const storedBranchName = localStorage.getItem("selected_branch_name");
 
-    const branchFilteredData = storedBranchName 
+    const branchFilteredData = storedBranchName
       ? originalData.filter(item => item.branch_name === storedBranchName)
       : originalData;
 
@@ -558,7 +597,7 @@ const ITEM_HEIGHT = 20;
 
     const filtered = branchFilteredData.filter((item) => {
       const areaName = (item.areaName || "").toLowerCase();
-      return areaName.includes(query)
+      return areaName.includes(query);
     });
 
     setTableData(filtered);
@@ -577,12 +616,13 @@ const ITEM_HEIGHT = 20;
         message: "No Results",
         description: `No matches found for "${searchText}".`,
       });
-    } else {
-      notification.success({
-        message: "Search Complete",
-        description: `${filtered.length} result(s) found for "${searchText}".`,
-      });
-    }
+    } 
+    // else {
+    //   notification.success({
+    //     message: "Search Complete",
+    //     description: `${filtered.length} result(s) found for "${searchText}".`,
+    //   });
+    // }
   };
 
   const searchModal = (
@@ -651,58 +691,57 @@ const ITEM_HEIGHT = 20;
 
   return (
     <div className="view-area-page-content">
-     <div className="view-area-header-container">
-  {reOrder ? (
-    <div style={{ flex: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className="view-area-title">Reorder Area</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="view-area-switch-label">Slide</span>
-          <Switch
-            checked={isDragMode}
-            onChange={(checked) => setIsDragMode(checked)}
-          />
-        </div>
-      </div>
-      <div style={{ marginTop: '8px',marginBottom: '10px' ,display: 'flex',justifyContent: 'center'}}>
-       
-        <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
-          Line : {selectedLine}
-        </Tag>
-      </div>
-    </div>
-  ) : (
-    <>
-      <h2 className="view-area-title">Area List</h2>
-      <div className="view-area-actions">
-        <Button
-          icon={<SwapOutlined rotate={90}/>}
-          onClick={clickReorder}
-          disabled={reOrder || tableLoader}
-          className="view-area-reorder-button"
-          type="default"
-        >
-          {!isMobile && "Reorder"}
-        </Button>
-        
-        <Button
-          icon={<SearchOutlined />}
-          onClick={() => setSearchModalVisible(true)}
-          type="default"
-        >
-          {!isMobile && "Search Area"}
-        </Button>
-        {showReset && (
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleReset}
-            title="Reset to Original"
-          />
+      <div className="view-area-header-container">
+        {reOrder ? (
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="view-area-title">Reorder Area</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="view-area-switch-label">Slide</span>
+                <Switch
+                  checked={isDragMode}
+                  onChange={(checked) => setIsDragMode(checked)}
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: '8px', marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
+              <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
+                Line : {selectedLine}
+              </Tag>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h2 className="view-area-title">Area List</h2>
+            <div className="view-area-actions">
+              <Button
+                icon={<SwapOutlined rotate={90} />}
+                onClick={clickReorder}
+                disabled={reOrder || tableLoader}
+                className="view-area-reorder-button"
+                type="default"
+              >
+                {!isMobile && "Reorder"}
+              </Button>
+
+              <Button
+                icon={<SearchOutlined />}
+                onClick={() => setSearchModalVisible(true)}
+                type="default"
+              >
+                {!isMobile && "Search Area"}
+              </Button>
+              {showReset && (
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleReset}
+                  title="Reset to Original"
+                />
+              )}
+            </div>
+          </>
         )}
       </div>
-    </>
-  )}
-</div>
       {searchModal}
       {lineSelectionModal}
 
@@ -740,7 +779,7 @@ const ITEM_HEIGHT = 20;
               type="primary"
               onClick={SumbitReorder}
               loading={reorderLoader}
-              disabled={reorderLoader || !rowReorderred}
+              disabled={reorderLoader}
             >
               Submit
             </Button>
@@ -759,40 +798,38 @@ const ITEM_HEIGHT = 20;
             </div>
           )}
 
-         {Object.keys(groupedData).map((lineName, lineGroupIndex) => {
-  const allLineNames = Object.keys(groupedData);
-  const isLastLineGroup = lineGroupIndex === allLineNames.length - 1;
+          {Object.keys(groupedData).map((lineName, lineGroupIndex) => {
+            const allLineNames = Object.keys(groupedData);
+            const isLastLineGroup = lineGroupIndex === allLineNames.length - 1;
 
-  const currentLineData = groupedData[lineName];
-  const lastArea = currentLineData[currentLineData.length - 1];
+            const currentLineData = groupedData[lineName];
+            const lastArea = currentLineData[currentLineData.length - 1];
 
-  const isLastAreaExpanded = lastArea
-    ? expandedAreas[`${lineName}-${lastArea.id}`]
-    : false;
+            const isLastAreaExpanded = lastArea
+              ? expandedAreas[`${lineName}-${lastArea.id}`]
+              : false;
 
-  // Count expanded areas in this line
-  const expandedCount = currentLineData.filter(
-    (area) => expandedAreas[`${lineName}-${area.id}`]
-  ).length;
+            const expandedCount = currentLineData.filter(
+              (area) => expandedAreas[`${lineName}-${area.id}`]
+            ).length;
 
-  // Remaining slots to reach 8
-  const remainingSlots = Math.max(
-    MAX_VISIBLE_ITEMS - expandedCount,
-    0
-  );
+            const remainingSlots = Math.max(
+              MAX_VISIBLE_ITEMS - expandedCount,
+              0
+            );
 
-  const shouldAddPadding =
-    isLastLineGroup && isLastAreaExpanded;
+            const shouldAddPadding =
+              isLastLineGroup && isLastAreaExpanded;
 
-  const paddingBottom = shouldAddPadding
-    ? remainingSlots * ITEM_HEIGHT
-    : 0;
-            
+            const paddingBottom = shouldAddPadding
+              ? remainingSlots * ITEM_HEIGHT
+              : 0;
+
             return (
               <div
                 key={lineName}
                 className="view-area-line-group"
-                style={{paddingBottom}}
+                style={{ paddingBottom }}
               >
                 <div className="view-area-line-header">
                   <div className="view-area-line-title-container">
@@ -902,22 +939,20 @@ const ITEM_HEIGHT = 20;
                                               </Menu.Item>
                                               <Menu.Item key="delete">
                                                 <Popconfirm
-                                                  // **Customize the title for the Area context**
                                                   title={`Delete area ${area.area_name || 'this area'}?`}
                                                   description="Are you sure you want to delete this area permanently?"
                                                   icon={<ExclamationCircleOutlined style={{ color: "red" }} />}
                                                   onConfirm={(e) => {
                                                     e.stopPropagation();
-                                                    onDelete(area); // Calls onDelete only after user confirms
+                                                    onDelete(area);
                                                   }}
                                                   okText="Delete"
                                                   cancelText="Cancel"
                                                   okButtonProps={{ danger: true, type: "primary" }}
                                                   cancelButtonProps={{ type: "default" }}
-                                                  onClick={(e) => e.stopPropagation()} // Prevents the dropdown from closing early
+                                                  onClick={(e) => e.stopPropagation()}
                                                 >
                                                   <div className="d-flex align-items-center gap-1" style={{ color: "red" }}>
-                                                    {/* Assuming you have the DeleteFilled icon imported from antd/icons */}
                                                     <DeleteFilled style={{ color: "red" }} />
                                                     <span>Delete</span>
                                                   </div>

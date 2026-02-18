@@ -17,6 +17,7 @@ import {
   Tag,
   Spin,
   Switch,
+  Input
 } from "antd";
 import { DELETE, GET } from "helpers/api_helper";
 import Loader from "components/Common/Loader";
@@ -59,6 +60,7 @@ const InvestmentTypeList = () => {
   const [searchCriteria, setSearchCriteria] = useState(null);
   const [showReset, setShowReset] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [investmentTitleSearch, setInvestmentTitleSearch] = useState("");
 
   const ITEMS_PAGE_SIZE = 10;
   const ALL_LINES_VALUE = "__ALL_LINES__";
@@ -183,44 +185,53 @@ const InvestmentTypeList = () => {
   };
 
   const handleSearch = () => {
-    const isAllLines = selectedLines.includes(ALL_LINES_VALUE) || selectedLines.length === 0;
+  const isAllLines = selectedLines.includes(ALL_LINES_VALUE) || selectedLines.length === 0;
 
-    let filtered = [...allTypes];
+  let filtered = [...allTypes];
 
-    if (!isAllLines && selectedLines.length > 0) {
-      filtered = filtered.filter((t) => selectedLines.includes(t.line_name || "Uncategorized"));
-    }
+  if (!isAllLines && selectedLines.length > 0) {
+    filtered = filtered.filter((t) => selectedLines.includes(t.line_name || "Uncategorized"));
+  }
 
-    if (multiUserFilter === "yes") {
-      filtered = filtered.filter((t) => t.multi_user_allocation === true);
-    } else if (multiUserFilter === "no") {
-      filtered = filtered.filter((t) => t.multi_user_allocation === false);
-    }
+  if (multiUserFilter === "yes") {
+    filtered = filtered.filter((t) => t.multi_user_allocation === true);
+  } else if (multiUserFilter === "no") {
+    filtered = filtered.filter((t) => t.multi_user_allocation === false);
+  }
 
-    const criteria = {
-      lines: isAllLines ? ["All Lines"] : selectedLines,
-      multiUser: multiUserFilter,
-    };
+  // ← new: filter by investment title
+  if (investmentTitleSearch.trim()) {
+    const query = investmentTitleSearch.trim().toLowerCase();
+    filtered = filtered.filter((t) =>
+      t.investment_title?.toLowerCase().includes(query)
+    );
+  }
 
-    setSearchCriteria(criteria);
-
-    const grouped = groupByLine(filtered);
-    setGroupedData(grouped);
-    Object.keys(grouped).forEach((ln) => initializeLinePagination(ln, grouped[ln].length));
-
-    setSearchModalVisible(false);
-    setShowReset(true);
-    setHasSearched(true);
-
-    if (filtered.length === 0) {
-      notification.warning({ message: "No Results", description: "No investment types match the selected filters." });
-    }
+  const criteria = {
+    lines: isAllLines ? ["All Lines"] : selectedLines,
+    multiUser: multiUserFilter,
+    investmentTitle: investmentTitleSearch.trim() || null,  // ← new
   };
 
+  setSearchCriteria(criteria);
+
+  const grouped = groupByLine(filtered);
+  setGroupedData(grouped);
+  Object.keys(grouped).forEach((ln) => initializeLinePagination(ln, grouped[ln].length));
+
+  setSearchModalVisible(false);
+  setShowReset(true);
+  setHasSearched(true);
+
+  if (filtered.length === 0) {
+    notification.warning({ message: "No Results", description: "No investment types match the selected filters." });
+  }
+};
   const handleReset = () => {
     setGroupedData({});
     setInvestmentTypesPagination({});
     setSelectedLines([]);
+    setInvestmentTitleSearch("");
     setMultiUserFilter("all");
     setSearchCriteria(null);
     setShowReset(false);
@@ -357,6 +368,17 @@ const InvestmentTypeList = () => {
             <Select.Option value="no">No (Single User)</Select.Option>
           </Select>
         </div>
+        <div>
+  <p className="inv-type-list-modal-label">Investment Title:</p>
+  <Input
+    placeholder="Search by investment title"
+    value={investmentTitleSearch}
+    onChange={(e) => setInvestmentTitleSearch(e.target.value)}
+    allowClear
+    size="large"
+    // prefix={<SearchOutlined />}
+  />
+</div>
 
       </div>
     </Modal>
@@ -410,6 +432,11 @@ const InvestmentTypeList = () => {
                 ? "Yes"
                 : "No"}
             </Tag>
+            {searchCriteria.investmentTitle && (
+  <Tag color="purple" style={{ margin: 0, padding: "4px 8px" }}>
+    Investment Title: {searchCriteria.investmentTitle}
+  </Tag>
+)}
           </div>
           <Divider style={{ margin: "5px 0" }} />
         </>

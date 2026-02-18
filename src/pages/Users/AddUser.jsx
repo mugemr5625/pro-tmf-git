@@ -621,67 +621,65 @@ if (isEditMode) {
     {/* Full Name and User Name */}
     <div className="row mb-2">
       <div className="col-md-6">
-       <Form.Item
-    label="Full Name"
-    name="full_name"
-    rules={[
-        {
-            required: true,
-            message: "Please enter the full name",
-        },
-        {
-            pattern: /^[A-Za-z\s]+$/,
-            message: "Full name must contain only alphabets and spaces",
-        },
-    ]}
+     <Form.Item
+  label="Full Name"
+  name="full_name"
+  rules={[
+    { required: true, message: "Please enter the full name" },
+    {
+      pattern: /^[A-Za-z][A-Za-z0-9\- ]*$/,
+      message: "First character should be alphabet",
+    },
+  ]}
 >
-    <InputWithAddon
-        icon={<UserOutlined />}
-        placeholder="Enter full name"
-        size="large"
-        onValueFilter={(value) => value.replace(/[^A-Za-z\s]/g, '')}
-    />
+  <InputWithAddon
+    icon={<UserOutlined />}
+    placeholder="Enter full name"
+    size="large"
+    onValueFilter={(value) => {
+      if (!value) return "";
+      let filtered = "";
+      for (let i = 0; i < value.length; i++) {
+        if (i === 0) {
+          if (/[A-Za-z]/.test(value[i])) filtered += value[i];
+        } else {
+          if (/[A-Za-z0-9\- ]/.test(value[i])) filtered += value[i];
+        }
+      }
+      return filtered;
+    }}
+  />
 </Form.Item>
       </div>
       <div className="col-md-6">
-        <Form.Item
-    label="User Name"
-    name="username"
-    rules={[
-        {
-            required: true,
-            message: "Please enter the user name",
-        },
-        {
-            pattern: /^[A-Za-z][A-Za-z0-9]*$/,
-            message: "User name must start with an alphabet and can contain only alphabets and numbers",
-        },
-    ]}
+       <Form.Item
+  label="User Name"
+  name="username"
+  rules={[
+    { required: true, message: "Please enter the user name" },
+    {
+      pattern: /^[A-Za-z][A-Za-z0-9\-]*$/,
+      message: "Must start with a letter",
+    },
+  ]}
 >
-    <InputWithAddon
-        icon={<UserOutlined />}
-        placeholder="Enter user name"
-        size="large"
-        onValueFilter={(value) => {
-            if (!value) return '';
-            
-            let filtered = '';
-            for (let i = 0; i < value.length; i++) {
-                if (i === 0) {
-                    // First character: only alphabets
-                    if (/[A-Za-z]/.test(value[i])) {
-                        filtered += value[i];
-                    }
-                } else {
-                    // Rest: alphanumeric only
-                    if (/[A-Za-z0-9]/.test(value[i])) {
-                        filtered += value[i];
-                    }
-                }
-            }
-            return filtered;
-        }}
-    />
+  <InputWithAddon
+    icon={<UserOutlined />}
+    placeholder="Enter user name"
+    size="large"
+    onValueFilter={(value) => {
+      if (!value) return "";
+      let filtered = "";
+      for (let i = 0; i < value.length; i++) {
+        if (i === 0) {
+          if (/[A-Za-z]/.test(value[i])) filtered += value[i];
+        } else {
+          if (/[A-Za-z0-9\-]/.test(value[i])) filtered += value[i];  // ← hyphen added
+        }
+      }
+      return filtered;
+    }}
+  />
 </Form.Item>
       </div>
     </div>
@@ -847,19 +845,18 @@ if (isEditMode) {
             { required: true, message: "Please select a base branch" },
           ]}
         >
-        <SelectWithAddon
-  icon={<BankOutlined />}
-  placeholder="Select base branch"
+       <SelectWithAddon
+  icon={addlBranchLoader ? <Spin size="small" /> : <BankOutlined />}
+  placeholder={addlBranchLoader ? "Loading branches..." : "Select base branch"}
   showSearch
   size="large"
-  loading={addlBranchLoader}   // ← changed
-  notFoundContent={addlBranchLoader ? <Spin size="small" /> : "No branches found"}
+  disabled={addlBranchLoader}
   onChange={handleBaseBranchChange}
   filterOption={(input, option) =>
     (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
   }
 >
-  {addlBranchList.map((branch) => (   // ← changed from branchList
+  {addlBranchList.map((branch) => (
     <Option key={branch.id} value={branch.id}>
       {branch.branch_name}
     </Option>
@@ -876,24 +873,28 @@ if (isEditMode) {
           ]}
         >
           <SelectWithAddon
-            icon={<ApartmentOutlined />}
-            placeholder={selectedBaseBranch ? "Select base line" : "Select base branch first"}
-            showSearch
-            size="large"
-            loading={lineLoader}
-            disabled={selectedBaseBranch === null || selectedBaseBranch === undefined}
-              onChange={(value) => setSelectedBaseLineId(value)}
-               filterOption={(input, option) =>
+  icon={lineLoader ? <Spin size="small" /> : <ApartmentOutlined />}
+  placeholder={
+    !selectedBaseBranch
+      ? "Select base branch first"
+      : lineLoader
+      ? "Loading lines..."
+      : "Select base line"
+  }
+  showSearch
+  size="large"
+  disabled={!selectedBaseBranch || lineLoader}
+  onChange={(value) => setSelectedBaseLineId(value)}
+  filterOption={(input, option) =>
     (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
   }
-          >
-            
-            {baseLineList.map((option) => (
-  <Option key={option.line_id} value={option.line_id}>
-    {option.line_name}
-  </Option>
-            ))}
-          </SelectWithAddon>
+>
+  {baseLineList.map((option) => (
+    <Option key={option.line_id} value={option.line_id}>
+      {option.line_name}
+    </Option>
+  ))}
+</SelectWithAddon>
         </Form.Item>
       </div>
     </div>
@@ -943,12 +944,11 @@ if (isEditMode) {
     ]}
   >
    <SelectWithAddon
-  icon={<BankOutlined />}
-  placeholder="Select branch"
+  icon={branchLoader ? <Spin size="small" /> : <BankOutlined />}
+  placeholder={branchLoader ? "Loading branches..." : "Select branch"}
   showSearch
   size="large"
-  loading={branchLoader}
-  notFoundContent={branchLoader ? <Spin size="small" /> : "No branches found"}
+  disabled={branchLoader}
   mode="multiple"
   allowClear
   onChange={handleBranchChange}
@@ -1021,14 +1021,19 @@ if (isEditMode) {
       { required: true, message: "Please select a line" },
     ]}
   >
-   <SelectWithAddon
-  icon={<ApartmentOutlined />}
-  placeholder={selectedBranches.length > 0 ? "Select Line" : "Select branches first"}
+  <SelectWithAddon
+  icon={lineLoader ? <Spin size="small" /> : <ApartmentOutlined />}
+  placeholder={
+    lineLoader
+      ? "Loading lines..."
+      : selectedBranches.length > 0
+      ? "Select Line"
+      : "Select branches first"
+  }
   showSearch
   size="large"
-  loading={lineLoader}
+  disabled={!selectedBranches || selectedBranches.length === 0 || lineLoader}
   mode="multiple"
-  disabled={!selectedBranches || selectedBranches.length === 0}
   allowClear
   open={lineFormDropdownOpen}
   onDropdownVisibleChange={(open) => setLineFormDropdownOpen(open)}
@@ -1162,25 +1167,25 @@ if (isEditMode) {
                   : []
                 }
               > 
-               <SelectWithAddon
-  icon={<ApartmentOutlined />}
+              <SelectWithAddon
+  icon={lineLoader ? <Spin size="small" /> : <ApartmentOutlined />}
   placeholder={
-    expenseMappingLineOptions.length > 0   // ← changed
+    lineLoader
+      ? "Loading lines..."
+      : expenseMappingLineOptions.length > 0
       ? "Select Line"
       : "No lines available — select branches/base branch first"
   }
   showSearch
   size="large"
-  loading={lineLoader}
+  disabled={expenseMappingLineOptions.length === 0 || lineLoader}
   value={mapping.lineId}
   onChange={(value) => updateExpenseMapping(mapping.id, "lineId", value)}
-  disabled={expenseMappingLineOptions.length === 0}   // ← changed
- filterOption={(input, option) =>
+  filterOption={(input, option) =>
     (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
   }
 >
- 
-  {expenseMappingLineOptions.map((option) => (   // ← changed from filteredLineList
+  {expenseMappingLineOptions.map((option) => (
     <Option key={option.line_id} value={option.line_id}>
       {option.line_name}
     </Option>
@@ -1197,35 +1202,29 @@ if (isEditMode) {
                   required
                   style={{ flexGrow: 1 }}
                 >
-                  <SelectWithAddon
-                    icon={<DollarOutlined />}
-                    mode="multiple"
-                    placeholder="Search and select expenses"
-                    value={mapping.expanses}
-                    onChange={(value) => {
-                      console.log("Selected value:", value);
-                      console.log("Current mapping.expanses:", mapping.expanses);
-                      updateExpenseMapping(mapping.id, 'expanses', value);
-                    }}
-                     filterOption={(input, option) => {
+                 <SelectWithAddon
+  icon={expenseLoading ? <Spin size="small" /> : <DollarOutlined />}
+  mode="multiple"
+  placeholder={expenseLoading ? "Loading expenses..." : "Search and select expenses"}
+  value={mapping.expanses}
+  onChange={(value) => updateExpenseMapping(mapping.id, 'expanses', value)}
+  filterOption={(input, option) => {
     if (!input) return true;
     const searchText = option?.children ?? option?.name ?? "";
     return searchText.toLowerCase().includes(input.toLowerCase());
   }}
-                    loading={expenseLoading}
-                    showSearch
-                    allowClear
-                    size="large"
-                    notFoundContent={
-                      expenseLoading ? "Loading..." : "No expenses found"
-                    }
-                  >
-                    {getFilteredExpenseOptions(mapping.lineId).map((option) => (
-                      <Option key={option.value} value={option.value} name={option.name}>
-                        {option.label}
-                      </Option>
-                    ))}
-                  </SelectWithAddon>
+  disabled={expenseLoading}
+  showSearch
+  allowClear
+  size="large"
+  notFoundContent="No expenses found"
+>
+  {getFilteredExpenseOptions(mapping.lineId).map((option) => (
+    <Option key={option.value} value={option.value} name={option.name}>
+      {option.label}
+    </Option>
+  ))}
+</SelectWithAddon>
                 </Form.Item>
 
                 {/* Minus Button */}
