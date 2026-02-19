@@ -627,62 +627,60 @@ const SumbitReorder = async () => {
   const handleEditLine = (line) => navigate(`/line/edit/${line.id}`);
 
   return (
-    <div className="view-line-page-content">
-      <div className="view-line-header">
-        {reOrder && !branchModalVisible ? (
-          <div>
-            <h2 className="view-line-title">
-              Reorder Lines
-            </h2>
-            <div className="view-line-reorder-info">
-              Selected Branch: <span className="view-line-branch-name">{selectedBranch}</span>
-            </div>
+    
+     <div className="view-line-page-content">
+  <div className="view-line-header-container">  {/* ← change class name */}
+    {reOrder && !branchModalVisible ? (
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="view-line-title">Reorder Lines</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="view-line-switch-label">Slide</span>
+            <Switch
+              checked={isDragMode}
+              onChange={(checked) => setIsDragMode(checked)}
+            />
           </div>
-        ) : (
-          <h2 className="view-line-title">Line List</h2>
-        )}
-
-        <div className="view-line-actions">
-          {reOrder && !branchModalVisible ? (
-            <>
-              <span className="view-line-switch-label">Slide</span>
-              <Switch
-                checked={isDragMode}
-                onChange={(checked) => setIsDragMode(checked)}
-              />
-            </>
-          ) : (
-            <>
-              <Button
-              icon={<SwapOutlined rotate={90}/>}
-                onClick={clickReorder}
-                disabled={reOrder}
-                className="view-line-reorder-button"
-              >
-               {!isMobile&&"Reorder"}
-              </Button>
-              
-              <Button
-                icon={<SearchOutlined />}
-                onClick={() => setSearchModalVisible(true)}
-                type="default"
-              >
-                {!isMobile && "Search Line"}
-              </Button>
-              {showReset && (
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={handleReset}
-                  title="Reset to Original"
-                />
-              )}
-            </>
-          )}
+        </div>
+        <div style={{ marginTop: '8px', marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
+          <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
+            Branch : {selectedBranch}
+          </Tag>
         </div>
       </div>
-      {searchModal}
+    ) : (
+      <>
+        <h2 className="view-line-title">Line List</h2>
+        <div className="view-line-actions">
+          <Button
+            icon={<SwapOutlined rotate={90} />}
+            onClick={clickReorder}
+            disabled={reOrder}
+            className="view-line-reorder-button"
+          >
+            {!isMobile && "Reorder"}
+          </Button>
+          <Button
+            icon={<SearchOutlined />}
+            onClick={() => setSearchModalVisible(true)}
+            type="default"
+          >
+            {!isMobile && "Search Line"}
+          </Button>
+          {showReset && (
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleReset}
+              title="Reset to Original"
+            />
+          )}
+        </div>
+      </>
+    )}
+  </div>
 
-      {tableLoader && <Loader />}
+  {searchModal}
+  {tableLoader && <Loader />}
 
       {reOrder && !branchModalVisible ? (
         <div>

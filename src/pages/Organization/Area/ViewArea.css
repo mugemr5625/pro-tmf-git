@@ -5,14 +5,15 @@
   margin: 0px 0px;
 }
 
-.view-area-header-container {
+.view-line-header-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-top: 0;
   margin-left: 0;
-  padding: 0px;
-  
+  padding: 0;
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
 }
 
 .view-area-title {

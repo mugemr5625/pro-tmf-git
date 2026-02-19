@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback,useRef  } from "react";
 import { Form, Input, Button, Select, notification, Divider, Space, InputNumber, Tabs, Modal } from "antd";
 import { UserOutlined, PhoneOutlined, MailOutlined, IdcardOutlined, EnvironmentOutlined, FileTextOutlined, UserAddOutlined, ReloadOutlined, PlusOutlined, MinusOutlined, ApartmentOutlined,GlobalOutlined, BankFilled, BankOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from "react-router-dom";
@@ -53,6 +53,7 @@ const AddCustomer = () => {
     const [form] = Form.useForm();
     const params = useParams();
     const navigate = useNavigate();
+    const scrollRef = useRef(null);
 const [isScrolled, setIsScrolled] = useState(false);
     // Helper function to parse location string
     const parseLocation = (locationString) => {
@@ -80,11 +81,13 @@ const [isScrolled, setIsScrolled] = useState(false);
         return () => clearInterval(interval);
     }, [isGettingLocation]);
 useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
     const handleScroll = () => {
-        setIsScrolled(window.scrollY > 80);
+        setIsScrolled(el.scrollTop > 80);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
 }, []);
 const getAreaList = useCallback(async () => {
     try {
@@ -1269,28 +1272,73 @@ const handleLineChange = (lineId) => {
     ];
 
     return (
-        <>
-            {loader && <Loader />}
+    <>
+        {loader && <Loader />}
 
-            <div className="add-customer-page-content">
-                <div className="add-customer-container-fluid">
-                    <div className="row">
-                        <div className="col-md-12">
-                            <div className="add-customer-header">
-                                <h2 className="add-customer-title">
-                                    {params.id ? "Edit Customer" : "Add New Customer"}
-                                </h2>
-                            </div>
+        <div className="add-customer-page-content" ref={scrollRef} style={{ overflowY: 'auto', height: '100vh' }}>
+            <div className="add-customer-container-fluid">
+                <div className="row">
+                    <div className="col-md-12">
 
-                            <Tabs
-                                activeKey={activeTab}
-                                onChange={handleTabChange}
-                                items={tabItems}
-                                size="large"
-                                type="card"
-                                className="custom-tabs"
-                            />
+                        {/* ── Sticky Header ── */}
+   <div style={{
+    position: 'sticky',
+    top: 0,           // or top: '56px' if navbar overlaps
+    zIndex: 100,
+    backgroundColor: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 16px',
+    boxShadow: isScrolled ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
+    transition: 'box-shadow 0.3s ease',
+    minHeight: '48px',
+}}>
+    <h2 className="add-customer-title" style={{ margin: 0, fontSize: '20px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+        {params.id ? "Edit Customer" : "Add New Customer"}
+    </h2>
 
+    <div style={{
+        display: 'flex',
+        gap: '8px',
+        opacity: isScrolled ? 1 : 0,
+        pointerEvents: isScrolled ? 'auto' : 'none',
+        transition: 'opacity 0.3s ease',
+    }}>
+        <button onClick={() => handleTabChange("1")} style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '5px 12px', borderRadius: '20px',
+            border: activeTab === "1" ? 'none' : '1px solid #d9d9d9',
+            cursor: 'pointer', fontSize: '13px', fontWeight: 500,
+            backgroundColor: activeTab === "1" ? '#1890ff' : '#fff',
+            color: activeTab === "1" ? '#fff' : '#555',
+            whiteSpace: 'nowrap',
+        }}>
+            <UserAddOutlined /> Info
+        </button>
+
+        <button onClick={() => handleTabChange("2")} style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '5px 12px', borderRadius: '20px',
+            border: activeTab === "2" ? 'none' : '1px solid #d9d9d9',
+            cursor: 'pointer', fontSize: '13px', fontWeight: 500,
+            backgroundColor: activeTab === "2" ? '#1890ff' : '#fff',
+            color: activeTab === "2" ? '#fff' : '#555',
+            whiteSpace: 'nowrap',
+        }}>
+            <FileTextOutlined /> Doc
+        </button>
+    </div>
+</div>
+{/* Tabs — nav hidden when scrolled */}
+<Tabs
+    activeKey={activeTab}
+    onChange={handleTabChange}
+    items={tabItems}
+    size="large"
+    type="card"
+    className={`custom-tabs ${isScrolled ? 'tabs-scrolled' : ''}`}
+/>
                             {/* Fullscreen Loading Overlay - Freezes entire page */}
                             <LocationLoadingOverlay visible={isGettingLocation} timer={locationTimer} />
 

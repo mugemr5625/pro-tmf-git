@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Select, Form, Input, Button, Switch, message, Divider, Space ,Spin,Tooltip} from "antd";
+import { Select, Form, Input, Button, Switch, message, Divider, Space ,Spin,Tooltip,notification} from "antd";
 import {
   BankOutlined,
   ApartmentOutlined,
@@ -450,153 +450,163 @@ const expenseMappingLineOptions = useMemo(() => {
       .filter(exp => exp.line_id === lineId) 
       .map(item => ({ value: item.id, label: item.name, name: item.name }));
   }, [expenseTypes]);
-
-
 const onFinish = async (values) => {
-    // Validate expense mappings only if in Edit Mode (where the block is visible)
-if (isEditMode) {
-  const hasInvalidMapping = expenseMappings.some(
-    (mapping) => !mapping.lineId || mapping.expanses.length === 0
-  );
-  if (hasInvalidMapping) {
-    message.error("Please select a line and at least one expense for each mapping.");
-    return;
-  }
-}
-
-    setLoading(true);
-
-    try {
-      const branchIds = Array.isArray(values.branchId) ? values.branchId : [];
-      const lineIds = Array.isArray(values.lineId) ? values.lineId : [];
-
-      // BUILD line_allocations array
-      const lineAllocations = [];
-      
-      if (values.role === 'agent' && lineIds.length > 0) {
-        // For agents: create line_allocations from selected lines
-        lineIds.forEach(lineId => {
-          const lineData = lineList.find(l => l.line_id === lineId);
-          if (lineData) {
-            lineAllocations.push({
-              branch: lineData.branch_id,
-              line: lineId,
-              branch_name: lineData.branch_name,
-              line_name: lineData.line_name,
-            });
-          }
-        });
-      } else if (values.role === 'owner' || values.role === 'manager') {
-        // For owner/manager: create line_allocations from all lines under selected branches
-        branchIds.forEach(branchId => {
-          const branchData = branchList.find(b => b.id === branchId);
-          if (branchData) {
-            // Get all lines under this branch
-            const branchLines = lineList.filter(line => line.branch_id === branchId);
-            
-            branchLines.forEach(line => {
-              lineAllocations.push({
-                branch: branchId,
-                line: line.line_id,
-                branch_name: line.branch_name,
-                line_name: line.line_name,
-              });
-            });
-          }
-        });
-      }
-
-      // BUILD user_expenses array
-      const userExpenses = [];
-      
-      if (isEditMode) {
-        expenseMappings.forEach(mapping => {
-          if (mapping.expanses && mapping.expanses.length > 0) {
-            mapping.expanses.forEach(expenseId => {
-              if (mapping.lineId) {
-                // Expense mapped to specific line
-                const lineData = lineList.find(l => l.line_id === mapping.lineId);
-                
-                if (lineData) {
-                  userExpenses.push({
-                    expense: expenseId,
-                    expense_branchid: lineData.branch_id,
-                    expense_branch_name: lineData.branch_name,
-                    expense_lineid: mapping.lineId,
-                    expense_line_name: lineData.line_name,
-                  });
-                }
-              }
-            });
-          }
-        });
-      }
-
-      // Get base branch and line NAMES
-      let baseBranchName = null;
-      let baseLineName = null;
-      
-      if (values.baseBranchId) {
-        const baseBranch = addlBranchList.find((b) => b.id === values.baseBranchId);
-        baseBranchName = baseBranch ? baseBranch.branch_name : null;
-      }
-      
-      if (values.baseLineId) {
-        const baseLine = lineList.find(l => l.line_id === values.baseLineId); 
-        baseLineName = baseLine ? baseLine.line_name : null;
-      }
-
-      // BUILD the final payload
-      const payload = {
-        username: values.username,
-        full_name: values.full_name,
-        mobile_number: values.mobile_number,
-        email: values.email || "",
-        address: values.address || null,
-        pin_code: values.pin_code || null,
-        role: values.role,
-        allow_old_transaction: values.allowTransaction || false,
-        base_branch: baseBranchName,
-        base_line: baseLineName,
-        line_allocations: lineAllocations,
-        user_expenses: isEditMode ? userExpenses : [],
-      };
-
-      // Add password only if provided
-      if (values.password) {
-        payload.password = values.password;
-      }
-
-      let response;
-      if (isEditMode) {
-        response = await PUT(`${USERS}${userId}/`, payload);
-        if (response) {
-          message.success("User updated successfully");
-          navigate("/user/list");
-        }
-      } else {
-        response = await POST(USERS, payload);
-
-        if (response?.status === 200 || response?.status === 201) {
-          message.success("User added successfully");
-          form.resetFields();
-          setExpenseMappings([{ id: Date.now(), lineId: null, expanses: [] }]);
-          navigate("/user/list");
-        } else if (response?.status === 400) {
-          const errorMessage =
-            response?.data?.mobile_number ||
-            response?.data?.email ||
-            "User not created";
-          message.error(errorMessage);
-        }
-      }
-    } catch (error) {
-      console.error("Error adding/updating user:", error);
-      message.error(error?.response?.data?.message || "Failed to add/update user");
-    } finally {
-      setLoading(false);
+  if (isEditMode) {
+    const hasInvalidMapping = expenseMappings.some(
+      (mapping) => !mapping.lineId || mapping.expanses.length === 0
+    );
+    if (hasInvalidMapping) {
+      notification.error({
+        message: "Validation Error",
+        description: "Please select a line and at least one expense for each mapping.",
+        duration: 5,
+      });
+      return;
     }
-  };
+  }
+
+  setLoading(true);
+
+  try {
+    const orgId = localStorage.getItem("org_id");
+    const branchIds = Array.isArray(values.branchId) ? values.branchId : [];
+    const lineIds = Array.isArray(values.lineId) ? values.lineId : [];
+    const areaIds = Array.isArray(values.areaId) ? values.areaId : [];
+
+    const allExpenseIds = expenseMappings.flatMap(mapping => mapping.expanses || []);
+
+    const payload = {
+      username: values.username,
+      full_name: values.full_name,
+      mobile_number: values.mobile_number,
+      email: values.email || "",
+      address: values.address || null,
+      pin_code: values.pin_code || null,
+      role_name: values.role,
+      allow_old_transaction: values.allowTransaction || false,
+      allow_web_access: false,
+      organization: orgId ? Number(orgId) : null,
+      baseBranchId: values.baseBranchId,
+      baseLineId: values.baseLineId,
+      branchId: branchIds,
+      lineId: lineIds,
+      areaId: areaIds,
+      expanses: allExpenseIds,
+    };
+
+    if (values.password) {
+      payload.password = values.password;
+    }
+
+    const fieldLabels = {
+      role: "Role",
+      role_name: "Role Name",
+      username: "Username",
+      full_name: "Full Name",
+      mobile_number: "Mobile Number",
+      email: "Email",
+      password: "Password",
+      address: "Address",
+      pin_code: "Pincode",
+      organization: "Organization",
+      baseBranchId: "Base Branch",
+      baseLineId: "Base Line",
+      branchId: "Branch",
+      lineId: "Line",
+      areaId: "Area",
+      expanses: "Expenses",
+    };
+
+    const extractErrorMessage = (errors) => {
+      if (!errors) return null;
+      if (typeof errors === "string") return errors;
+
+      for (const [field, label] of Object.entries(fieldLabels)) {
+        if (errors?.[field]) {
+          const msg = Array.isArray(errors[field]) ? errors[field][0] : errors[field];
+          return `${label}: ${msg}`;
+        }
+      }
+
+      if (errors?.non_field_errors?.[0]) {
+        return errors.non_field_errors[0];
+      }
+
+      const firstKey = Object.keys(errors)[0];
+      if (firstKey) {
+        const msg = Array.isArray(errors[firstKey]) ? errors[firstKey][0] : errors[firstKey];
+        return `${firstKey}: ${msg}`;
+      }
+
+      return null;
+    };
+
+    let response;
+
+    if (isEditMode) {
+      response = await PUT(`${USERS}${userId}/`, payload);
+
+      if (response?.status === 200 || response?.status === 201) {
+        notification.success({
+          message: "Success",
+          description: "User updated successfully",
+          duration: 5,
+        });
+        navigate("/user/list");
+      } else if (response?.status === 400) {
+        const errorMessage = extractErrorMessage(response?.data);
+        notification.error({
+          message: "Update Failed",
+          description: errorMessage || "Failed to update user. Please try again.",
+          duration: 5,
+        });
+      } else {
+        notification.error({
+          message: "Update Failed",
+          description: "Failed to update user. Please try again.",
+          duration: 5,
+        });
+      }
+
+    } else {
+      response = await POST(USERS, payload);
+
+      if (response?.status === 200 || response?.status === 201) {
+        notification.success({
+          message: "Success",
+          description: "User added successfully",
+          duration: 5,
+        });
+        form.resetFields();
+        setExpenseMappings([{ id: Date.now(), lineId: null, expanses: [] }]);
+        navigate("/user/list");
+      } else if (response?.status === 400) {
+        const errorMessage = extractErrorMessage(response?.data);
+        notification.error({
+          message: "Creation Failed",
+          description: errorMessage || "Failed to create user. Please try again.",
+          duration: 5,
+        });
+      } else {
+        notification.error({
+          message: "Creation Failed",
+          description: "Failed to create user. Please try again.",
+          duration: 5,
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error("Error adding/updating user:", error);
+    notification.error({
+      message: "Error",
+      description: error?.response?.data?.message || "Failed to add/update user",
+      duration: 5,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <>
       {loading && <Loader />}
@@ -852,6 +862,7 @@ if (isEditMode) {
   size="large"
   disabled={addlBranchLoader}
   onChange={handleBaseBranchChange}
+   notFoundContent={addlBranchLoader ? <Spin size="small" /> : "No branches available"}
   filterOption={(input, option) =>
     (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
   }
@@ -880,6 +891,13 @@ if (isEditMode) {
       : lineLoader
       ? "Loading lines..."
       : "Select base line"
+  }
+   notFoundContent={
+    !selectedBaseBranch
+      ? "Select a base branch first"
+      : lineLoader
+      ? <Spin size="small" />
+      : "No lines available for selected branch"
   }
   showSearch
   size="large"
@@ -954,6 +972,7 @@ if (isEditMode) {
   onChange={handleBranchChange}
   open={branchDropdownOpen}
   onDropdownVisibleChange={(open) => setBranchDropdownOpen(open)}
+   notFoundContent={branchLoader ? <Spin size="small" /> : "No branches available"}
   maxTagCount={1}
   maxTagTextLength={10}
   maxTagPlaceholder={(omittedValues) => (
@@ -1037,6 +1056,13 @@ if (isEditMode) {
   allowClear
   open={lineFormDropdownOpen}
   onDropdownVisibleChange={(open) => setLineFormDropdownOpen(open)}
+   notFoundContent={
+    selectedBranches.length === 0
+      ? "Select branches first"
+      : lineLoader
+      ? <Spin size="small" />
+      : "No lines available for selected branches"
+  }
   maxTagCount={1}
   maxTagTextLength={10}
   maxTagPlaceholder={(omittedValues) => {
@@ -1174,6 +1200,11 @@ if (isEditMode) {
       ? "Loading lines..."
       : expenseMappingLineOptions.length > 0
       ? "Select Line"
+      : "No lines available — select branches/base branch first"
+  }
+   notFoundContent={
+    lineLoader
+      ? <Spin size="small" />
       : "No lines available — select branches/base branch first"
   }
   showSearch
