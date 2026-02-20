@@ -98,13 +98,13 @@ const ViewArea = () => {
         api.success({
           message: "Re-Ordered",
           description: "The order has been updated successfully. ",
-          duration: 0,
+          duration: 5, 0,
         });
       } else {
         api.error({
           message: "Re-Ordered",
           description: "Failed to update the order",
-          duration: 0,
+          duration: 5, 0,
         });
       }
       setReorderLoader(false);
@@ -193,7 +193,7 @@ const ViewArea = () => {
         api.error({
           message: "Area Delete",
           description: "The Area is not deleted ",
-          duration: 0,
+          duration: 5, 0,
         });
       } else {
         const updatedData = tableData.filter((item) => item.id !== record.id);
@@ -201,7 +201,7 @@ const ViewArea = () => {
         api.success({
           message: `${record?.areaName.toUpperCase()} Area Deleted!`,
           description: "The line has been deleted successfully ",
-          duration: 0,
+          duration: 5, 0,
         });
       }
       setDeleteLoader(false);
@@ -212,7 +212,7 @@ const ViewArea = () => {
       api.success({
         message: "Area Deleted",
         description: "The Area is not deleted ",
-        duration: 0,
+        duration: 5, 0,
       });
     }
   };

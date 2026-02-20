@@ -81,7 +81,7 @@ const AddBranch = () => {
         await fetchBranchDocuments(params.id);
       }
     } catch (error) {
-      notification.error({ message: 'Error', description: 'Failed to fetch branch details', duration: 3 });
+      notification.error({ message: 'Error', description: 'Failed to fetch branch details', duration: 5 });
     } finally {
       setLoader(false);
     }
@@ -160,7 +160,7 @@ const AddBranch = () => {
       return false;
     }
     if (!(file instanceof File)) {
-      notification.error({ message: 'Error', description: 'Invalid file object. Please select the file again.', duration: 3 });
+      notification.error({ message: 'Error', description: 'Invalid file object. Please select the file again.', duration: 5 });
       return false;
     }
 
@@ -184,7 +184,7 @@ const AddBranch = () => {
       }
     } catch (error) {
       setDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: false } : f)));
-      notification.error({ message: 'Upload Failed', description: error.message || FILE_MESSAGES.UPLOAD_FAILED, duration: 3 });
+      notification.error({ message: 'Upload Failed', description: error.message || FILE_MESSAGES.UPLOAD_FAILED, duration: 5 });
       return false;
     }
   };
@@ -194,7 +194,7 @@ const AddBranch = () => {
     try {
       await form.validateFields(['branch_name', 'branch_address']);
     } catch {
-      notification.error({ message: 'Validation Error', description: 'Please fill in all required fields', duration: 3 });
+      notification.error({ message: 'Validation Error', description: 'Please fill in all required fields', duration: 5 });
       return;
     }
 
@@ -220,12 +220,12 @@ const AddBranch = () => {
         if (response.status === 200 || response.status === 201) {
           if (params.id) {
             currentBranchId = params.id;
-            notification.success({ message: 'Branch Updated', description: 'Basic info updated successfully.', duration: 3 });
+            notification.success({ message: 'Branch Updated', description: 'Basic info updated successfully.', duration: 5 });
           } else {
             currentBranchId = response.data.id;
             setBranchId(currentBranchId);
             setIsBasicInfoSaved(true);
-            notification.success({ message: 'Branch Created', description: 'Branch created. Now upload documents.', duration: 3 });
+            notification.success({ message: 'Branch Created', description: 'Branch created. Now upload documents.', duration: 5 });
           }
         } else if (response.status === 400) {
           const errorMessages = [];
@@ -252,7 +252,7 @@ const AddBranch = () => {
         }
 
         if (allUploadsSuccessful) {
-          notification.success({ message: 'Documents Uploaded', description: 'All documents uploaded successfully.', duration: 3 });
+          notification.success({ message: 'Documents Uploaded', description: 'All documents uploaded successfully.', duration: 5 });
         }
 
         await fetchBranchDocuments(currentBranchId);
@@ -267,7 +267,7 @@ const AddBranch = () => {
       notification.error({
         message: 'Error',
         description: error?.response?.data?.detail || error.message || 'An error occurred. Please try again.',
-        duration: 3,
+        duration: 5,
       });
     } finally {
       setLoader(false);
@@ -285,7 +285,7 @@ const AddBranch = () => {
         try {
           const deleteResponse = await DELETE(`/api/branch-documents/${docId}/?branch_id=${branchId}`);
           if (deleteResponse.status !== 200 && deleteResponse.status !== 204) {
-            notification.error({ message: 'Error', description: 'Failed to delete document.', duration: 3 });
+            notification.error({ message: 'Error', description: 'Failed to delete document.', duration: 5 });
             return;
           }
 
@@ -305,9 +305,9 @@ const AddBranch = () => {
             }
           }
 
-          notification.success({ message: 'Deleted', description: `${fileName || 'Document'} deleted successfully.`, duration: 3 });
+          notification.success({ message: 'Deleted', description: `${fileName || 'Document'} deleted successfully.`, duration: 5 });
         } catch (error) {
-          notification.error({ message: 'Error', description: error.message || 'Deletion failed.', duration: 3 });
+          notification.error({ message: 'Error', description: error.message || 'Deletion failed.', duration: 5 });
         }
       },
     });
@@ -346,7 +346,7 @@ const AddBranch = () => {
 
   const viewDocument = (documentUrl, fileName) => {
     if (!documentUrl || typeof documentUrl !== 'string') {
-      notification.error({ message: 'Error', description: 'Document URL not found or invalid', duration: 3 });
+      notification.error({ message: 'Error', description: 'Document URL not found or invalid', duration: 5 });
       return;
     }
     let fileExtension = '';
@@ -678,7 +678,7 @@ const AddBranch = () => {
                 onLoad={() => setPreviewLoading(false)}
                 onError={() => {
                   setPreviewLoading(false);
-                  notification.error({ message: 'Error', description: 'Failed to load image', duration: 3 });
+                  notification.error({ message: 'Error', description: 'Failed to load image', duration: 5 });
                 }}
               />
             </div>

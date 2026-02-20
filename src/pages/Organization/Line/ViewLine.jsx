@@ -307,7 +307,7 @@ const SumbitReorder = async () => {
       notification.success({
         message: "Re-Ordered",
         description: `Successfully reordered ${reorderedItems.length} line(s).`,
-        duration: 3,
+        duration: 5,
       });
     } else {
       notification.error({

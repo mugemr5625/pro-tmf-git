@@ -250,7 +250,7 @@ const ViewArea = () => {
         notification.success({
           message: "Re-Ordered",
           description: `Successfully reordered ${reorderedItems.length} area(s).`,
-          duration: 3,
+          duration: 5,
         });
       } else {
         notification.error({

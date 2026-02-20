@@ -535,14 +535,14 @@ const LoanDisbursementList = () => {
       notification.success({
         message: 'Loan Deleted',
         description: `Loan for ${customerName} has been removed successfully.`,
-        duration: 3,
+        duration: 5,
       });
       
     } catch (error) {
       notification.error({
         message: 'Delete Failed',
         description: 'Failed to delete the loan. Please try again.',
-        duration: 3,
+        duration: 5,
       });
     }
   };

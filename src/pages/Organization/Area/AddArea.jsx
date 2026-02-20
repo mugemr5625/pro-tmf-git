@@ -79,7 +79,7 @@ const AddArea = () => {
           notification.warning({
             message: "Branch Not Found",
             description: "The selected branch was not found in the system.",
-            duration: 3,
+            duration: 5,
           });
         }
       }
@@ -90,7 +90,7 @@ const AddArea = () => {
       notification.error({
         message: "Error",
         description: "Failed to fetch branch information.",
-        duration: 3,
+        duration: 5,
       });
     }
   };

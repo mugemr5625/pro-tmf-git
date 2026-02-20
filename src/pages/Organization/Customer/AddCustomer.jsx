@@ -185,7 +185,7 @@ const getAreaList = useCallback(async () => {
         notification.error({
             message: 'Error',
             description: 'Failed to fetch area details',
-            duration: 3,
+            duration: 5,
         });
         console.error(error);
     }
@@ -304,7 +304,7 @@ const handleLineChange = (lineId) => {
             notification.error({
                 message: 'Error',
                 description: 'Failed to fetch customer details',
-                duration: 3,
+                duration: 5,
             });
             console.error(error);
         }
@@ -392,7 +392,7 @@ const handleLineChange = (lineId) => {
                     notification.success({
                         message: "High Accuracy Location Locked ✅",
                         description: `Accuracy: ${accuracy.toFixed(1)} meters | Time: ${timeElapsed}s`,
-                        duration: 3,
+                        duration: 5,
                     });
 
                     // ✅ Stop tracking once good accuracy is achieved
@@ -461,7 +461,7 @@ const handleLineChange = (lineId) => {
             notification.error({
                 message: 'No Location Selected',
                 description: 'Please select a location on the map or use current location',
-                duration: 3,
+                duration: 5,
             });
         }
     };
@@ -543,7 +543,7 @@ const handleLineChange = (lineId) => {
                 description: params.id
                     ? 'Customer details updated successfully. You can now manage documents.'
                     : 'Customer added successfully. You can now upload documents.',
-                duration: 3,
+                duration: 5,
             });
 
             // FIX: In both add and edit mode, go to document upload tab
@@ -643,7 +643,7 @@ const handleLineChange = (lineId) => {
                 notification.warning({
                     message: 'Complete Personal Information',
                     description: 'Please submit the personal information form before uploading documents.',
-                    duration: 3,
+                    duration: 5,
                 });
                 return;
             }

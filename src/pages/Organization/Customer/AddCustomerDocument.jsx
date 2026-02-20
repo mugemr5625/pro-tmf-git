@@ -230,7 +230,7 @@ const fetchExistingDocuments = async () => {
       notification.error({
         message: 'Error',
         description: 'Failed to fetch existing documents',
-        duration: 3,
+        duration: 5,
       });
     }
   } finally {
@@ -251,7 +251,7 @@ if (response?.status === 204 || response?.status === 200) {
           notification.success({
             message: 'Deleted',
             description: `${fileName || 'Document'} deleted successfully.`,
-            duration: 3,
+            duration: 5,
           });
 
           // Find the deleted document to get its type and index
@@ -330,14 +330,14 @@ if (response?.status === 204 || response?.status === 200) {
           notification.error({
             message: 'Deletion Failed',
             description: response?.data?.error || 'Failed to delete the document.',
-            duration: 3,
+            duration: 5,
           });
         }
       } catch (error) {
         notification.error({
           message: 'Error',
           description: error.response?.data?.error || error.message || 'An error occurred during deletion.',
-          duration: 3,
+          duration: 5,
         });
       } finally {
         setLoadingDocuments(false);
@@ -408,7 +408,7 @@ if (response?.status === 204 || response?.status === 200) {
       notification.error({
         message: 'Error',
         description: 'Document URL not found or invalid',
-        duration: 3,
+        duration: 5,
       });
       return;
     }
@@ -442,7 +442,7 @@ if (response?.status === 204 || response?.status === 200) {
       notification.error({
         message: 'Error',
         description: 'Failed to open document',
-        duration: 3,
+        duration: 5,
       });
     }
   };
@@ -538,7 +538,7 @@ const addOtherField = () => {
       notification.error({
         message: 'Error',
         description: 'Customer ID is missing. Please complete personal information first.',
-        duration: 3,
+        duration: 5,
       });
       return;
     }
@@ -564,7 +564,7 @@ const addOtherField = () => {
       notification.error({
         message: 'Error',
         description: 'Invalid file object. Please select the file again.',
-        duration: 3,
+        duration: 5,
       });
       return;
     }
@@ -596,7 +596,7 @@ const addOtherField = () => {
         notification.error({
           message: 'Upload Failed',
           description: errorMessage,
-          duration: 3,
+          duration: 5,
         });
         return;
       }
@@ -605,7 +605,7 @@ const addOtherField = () => {
         notification.success({
           message: 'Success',
           description: `${type} document uploaded successfully`,
-          duration: 3,
+          duration: 5,
         });
         
         const clearedFields = fields.map(field => 
@@ -626,7 +626,7 @@ const addOtherField = () => {
       notification.error({
         message: 'Upload Failed',
         description: error.response?.data?.error || error.message || 'An error occurred during upload',
-        duration: 3,
+        duration: 5,
       });
     }
   };
@@ -1149,7 +1149,7 @@ const isUploadDisabled = !field.file || !currentDescription || currentDescriptio
                         notification.error({
                           message: 'Error',
                           description: 'Failed to load image',
-                          duration: 3,
+                          duration: 5,
                         });
                       }}
                     />

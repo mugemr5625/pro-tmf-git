@@ -523,10 +523,10 @@ localStorage.removeItem("selected_area_name");
         notification.success({
           message: "Re-Ordered",
           description: `Successfully reordered ${reorderedItems.length} customer(s).`,
-          duration: 3,
+          duration: 5,
         });
       } else {
-        notification.error({ message: "Re-Order Failed", description: "Failed to update the order", duration: 3 });
+        notification.error({ message: "Re-Order Failed", description: "Failed to update the order", duration: 5 });
       }
       setReorderLoader(false);
     } catch (e) {
@@ -571,7 +571,7 @@ localStorage.removeItem("selected_area_name");
     } catch (error) {
       setCustomerDocuments((prev) => ({ ...prev, [customerId]: [] }));
       if (!error.message?.includes("Customer not found")) {
-        notification.error({ message: "Error", description: "Failed to fetch customer documents", duration: 3 });
+        notification.error({ message: "Error", description: "Failed to fetch customer documents", duration: 5 });
       }
       return [];
     } finally {
@@ -619,15 +619,15 @@ localStorage.removeItem("selected_area_name");
         notification.success({
           message: `Customer ${record?.customer_id} Deleted!`,
           description: "The customer has been deleted successfully",
-          duration: 3,
+          duration: 5,
         });
       } else {
-        notification.error({ message: "Customer Delete", description: "The customer was not deleted", duration: 3 });
+        notification.error({ message: "Customer Delete", description: "The customer was not deleted", duration: 5 });
       }
       setDeleteLoader(false);
     } catch (error) {
       setDeleteLoader(false);
-      notification.error({ message: "Customer Delete", description: "The customer was not deleted", duration: 3 });
+      notification.error({ message: "Customer Delete", description: "The customer was not deleted", duration: 5 });
     }
   };
 

@@ -350,6 +350,7 @@ const VerticalLayout = (props) => {
         { key: '/line', icon: <img src={lineIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Line' },
         { key: '/area', icon: <img src={areaIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Area' },
         { key: '/expense/list', icon:<img src={expenseTypeIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Expense Type' },
+        
         // ── Investment Type (new) ──────────────────────────────────────────
         { key: '/investment-type', icon: <img src={investmentIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Investment Type' },
         { key: '/investment', icon: <img src={investmentIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Investments' },

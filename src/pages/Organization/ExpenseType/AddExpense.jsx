@@ -215,19 +215,19 @@ const AddExpense = () => {
                 notification.error({
                     message: "Validation Error",
                     description: Array.isArray(errorData.name) ? errorData.name[0] : errorData.name,
-                    duration: 3,
+                    duration: 5,
                 });
             } else if (errorData.branch_id) {
                 notification.error({
                     message: "Branch Error",
                     description: Array.isArray(errorData.branch_id) ? errorData.branch_id[0] : errorData.branch_id,
-                    duration: 3,
+                    duration: 5,
                 });
             } else if (errorData.line_id) {
                 notification.error({
                     message: "Line Error",
                     description: Array.isArray(errorData.line_id) ? errorData.line_id[0] : errorData.line_id,
-                    duration: 3,
+                    duration: 5,
                 });
             } else {
                 // Generic error message
@@ -235,14 +235,14 @@ const AddExpense = () => {
                 notification.error({
                     message: "Error",
                     description: errorMsg,
-                    duration: 3,
+                    duration: 5,
                 });
             }
         } else {
             notification.error({
                 message: "Error",
                 description: error.message || "An error occurred while processing your request.",
-                duration: 3,
+                duration: 5,
             });
         }
     } finally {

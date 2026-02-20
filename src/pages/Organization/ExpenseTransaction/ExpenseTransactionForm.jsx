@@ -61,7 +61,7 @@ const ExpenseTransactionForm = () => {
       notification.error({
         message: "Error",
         description: "Failed to fetch branches.",
-        duration: 3,
+        duration: 5,
       });
     }
   };
@@ -84,7 +84,7 @@ const ExpenseTransactionForm = () => {
       notification.error({
         message: "Error",
         description: "Failed to fetch lines.",
-        duration: 3,
+        duration: 5,
       });
     }
   };
@@ -108,7 +108,7 @@ const ExpenseTransactionForm = () => {
     notification.error({
       message: "Error",
       description: "Failed to fetch expense types.",
-      duration: 3,
+      duration: 5,
     });
   }
 };

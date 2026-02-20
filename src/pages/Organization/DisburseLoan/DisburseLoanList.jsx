@@ -736,9 +736,9 @@ const LoanDisbursementList = () => {
     try {
       const customerName = customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM;
       setLoans(loans.filter(c => c.id !== customer.id));
-      notification.success({ message: 'Loan Deleted', description: `Loan for ${customerName} has been removed successfully.`, duration: 3 });
+      notification.success({ message: 'Loan Deleted', description: `Loan for ${customerName} has been removed successfully.`, duration: 5 });
     } catch (error) {
-      notification.error({ message: 'Delete Failed', description: 'Failed to delete the loan. Please try again.', duration: 3 });
+      notification.error({ message: 'Delete Failed', description: 'Failed to delete the loan. Please try again.', duration: 5 });
     }
   };
 

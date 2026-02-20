@@ -69,7 +69,7 @@ const LocationMapModal = ({
         notification.info({
             message: 'Getting Location',
             description: 'Please allow location access and wait...',
-            duration: 4,
+            duration: 5, 4,
         });
 
         const watchId = navigator.geolocation.watchPosition(
@@ -93,7 +93,7 @@ const LocationMapModal = ({
                     notification.success({
                         message: "High Accuracy Location Locked ✅",
                         description: `Accuracy: ${accuracy.toFixed(1)} meters`,
-                        duration: 3,
+                        duration: 5, 3,
                     });
 
                     navigator.geolocation.clearWatch(watchId);
@@ -149,7 +149,7 @@ const LocationMapModal = ({
             notification.error({
                 message: 'No Location Selected',
                 description: 'Please select a location on the map or use current location',
-                duration: 3,
+                duration: 5, 3,
             });
         }
     };
