@@ -10,7 +10,8 @@ import {
   Alert,
   Card,
   Grid,
-  Select
+  Select,
+  Empty,
 } from "antd";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
@@ -20,8 +21,8 @@ import {
 import { getDetails, getList } from "helpers/getters";
 import { Fragment, useState, useEffect, useCallback } from "react";
 import Loader from "components/Common/Loader";
-import { 
-  ReloadOutlined, 
+import {
+  ReloadOutlined,
   CalendarOutlined,
   UserOutlined,
   SyncOutlined,
@@ -50,7 +51,7 @@ const DisburseLoanForm = () => {
   const params = useParams();
   const location = useLocation();
 
-  const [customerList, setCustomerList] = useState(null);
+  const [customerList, setCustomerList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loan, setLoan] = useState(null);
   const [apiError, setApiError] = useState(false);
@@ -74,14 +75,37 @@ const DisburseLoanForm = () => {
   const navigationState = location.state || {};
   const { mode, customerId, customerName, loanData } = navigationState;
 
+  // ─── Normalise customer list ─────────────────────────────────────────────────
+  // API may return an array, an object like {"detail":"No Customer Exist"}, or null.
+  const normaliseCustomers = (raw) => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    // Object response such as { detail: "No Customer Exist" }
+    if (typeof raw === "object") {
+      const msg = raw.detail || raw.message || raw.error || "No customers found.";
+      notification.error({
+        message: "Customer List Unavailable",
+        description: msg,
+        duration: 5,
+      });
+      return [];
+    }
+    return [];
+  };
+
   const loadCustomerData = useCallback(async () => {
     try {
-      setCustomerList(null);
+      setCustomerList([]);
       const customers = await getList(CUSTOMERS);
       devLog("Customer list loaded:", customers);
-      setCustomerList(customers);
+      setCustomerList(normaliseCustomers(customers));
     } catch (error) {
       console.error("Error loading customer list:", error);
+      notification.warning({
+        message: "Customer List Unavailable",
+        description: "Failed to load customer list. Please try again.",
+        duration: 5,
+      });
       setApiError(true);
     }
   }, []);
@@ -95,32 +119,20 @@ const DisburseLoanForm = () => {
       setIsAddMode(true);
       setIsEditMode(false);
     }
-    
+
     // Set customer name if provided from navigation
     if (customerName) {
       setSelectedCustomerName(customerName);
     }
-    
+
     // Set branch, line, and area IDs from navigation state
-    if (navigationState.branchId) {
-      setBranchId(navigationState.branchId);
-    }
-    if (navigationState.lineId) {
-      setLineId(navigationState.lineId);
-    }
-    if (navigationState.areaId) {
-      setAreaId(navigationState.areaId);
-    }
-    if (navigationState.branchName) {
-      setBranchName(navigationState.branchName);
-    }
-    if (navigationState.lineName) {
-      setLineName(navigationState.lineName);
-    }
-    if (navigationState.areaName) {
-      setAreaName(navigationState.areaName);
-    }
-    
+    if (navigationState.branchId) setBranchId(navigationState.branchId);
+    if (navigationState.lineId) setLineId(navigationState.lineId);
+    if (navigationState.areaId) setAreaId(navigationState.areaId);
+    if (navigationState.branchName) setBranchName(navigationState.branchName);
+    if (navigationState.lineName) setLineName(navigationState.lineName);
+    if (navigationState.areaName) setAreaName(navigationState.areaName);
+
     loadCustomerData();
   }, [params.mode, params.id, mode, customerName, navigationState, loadCustomerData]);
 
@@ -134,7 +146,7 @@ const DisburseLoanForm = () => {
           devLog("Loan details loaded:", res);
           setLoan(res);
           setPaymentMode(res.loan_dsbrsmnt_mode || "Online");
-          
+
           // Save the IDs and names
           setBranchId(res.loan_dsbrsmnt_brnch_id);
           setLineId(res.loan_dsbrsmnt_line_id);
@@ -144,7 +156,7 @@ const DisburseLoanForm = () => {
           setAreaName(res.area_name || "");
           setCreatedBy(res.loan_dsbrsmnt_created_by);
           setUpdatedBy(res.loan_dsbrsmnt_updtd_by);
-          
+
           // Populate form with loan data
           form.setFieldsValue({
             loan_dsbrsmnt_cust_id: res.loan_dsbrsmnt_cust_id,
@@ -164,7 +176,7 @@ const DisburseLoanForm = () => {
             loan_dsbrsmnt_online_remarks: res.loan_dsbrsmnt_online_remarks,
             loan_dsbrsmnt_cash_remarks: res.loan_dsbrsmnt_cash_remarks,
           });
-          
+
           setLoading(false);
         })
         .catch((error) => {
@@ -178,7 +190,7 @@ const DisburseLoanForm = () => {
     } else if (isAddMode && customerId) {
       // Pre-fill customer ID for add mode
       setLoading(true);
-      
+
       // Wait for customer list to load before setting the value
       const checkCustomerList = setInterval(() => {
         if (customerList && customerList.length > 0) {
@@ -189,7 +201,7 @@ const DisburseLoanForm = () => {
           setLoading(false);
         }
       }, 100);
-      
+
       // Timeout after 5 seconds
       setTimeout(() => {
         clearInterval(checkCustomerList);
@@ -208,29 +220,13 @@ const DisburseLoanForm = () => {
   // Update customer name when customer is selected or loaded
   useEffect(() => {
     const formCustomerId = form.getFieldValue('loan_dsbrsmnt_cust_id');
-    if (formCustomerId && customerList) {
+    if (formCustomerId && customerList && customerList.length > 0) {
       const customer = customerList.find(c => c.id === formCustomerId);
       if (customer) {
-        const name = customer.customer_name || customer.customer_nm;
-        setSelectedCustomerName(name);
+        setSelectedCustomerName(customer.customer_name || customer.customer_nm);
       }
     }
   }, [form.getFieldValue('loan_dsbrsmnt_cust_id'), customerList]);
-
-  const calculateAmountPerInstallment = () => {
-    const loanAmount = form.getFieldValue("loan_dsbrsmnt_amnt") || 0;
-    const interestAmount = form.getFieldValue("loan_dsbrsmnt_intrst_amnt") || 0;
-    const processingFee = form.getFieldValue("loan_dsbrsmnt_prcsng_fee_amnt") || 0;
-    const numberOfInstallments = form.getFieldValue("loan_dsbrsmnt_tot_instlmnt") || 1;
-
-    const totalAmount = loanAmount + interestAmount + processingFee;
-    const amountPerInstallment = totalAmount / numberOfInstallments;
-
-    form.setFieldsValue({
-      loan_dsbrsmnt_instlmnt_amnt: amountPerInstallment.toFixed(2),
-      loan_dsbrsmnt_dflt_pay_amnt: amountPerInstallment.toFixed(2),
-    });
-  };
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -241,7 +237,7 @@ const DisburseLoanForm = () => {
         loan_dsbrsmnt_line_id: lineId,
         loan_dsbrsmnt_area_id: areaId,
         loan_dsbrsmnt_cust_id: values.loan_dsbrsmnt_cust_id,
-        
+
         // Form values
         loan_dsbrsmnt_dt: values.loan_dsbrsmnt_dt,
         loan_dsbrsmnt_repmnt_type: values.loan_dsbrsmnt_repmnt_type,
@@ -319,7 +315,7 @@ const DisburseLoanForm = () => {
 
   const handlePaymentModeChange = (value) => {
     setPaymentMode(value);
-    
+
     if (value !== "Both") {
       form.setFieldsValue({
         loan_dsbrsmnt_online_amnt: undefined,
@@ -345,7 +341,7 @@ const DisburseLoanForm = () => {
     setPaymentMode("Online");
   };
 
-  if (loading && customerList === null) {
+  if (loading && customerList.length === 0) {
     return (
       <div className="loan-form-page-content">
         <div className="loan-form-container-fluid">
@@ -430,16 +426,6 @@ const DisburseLoanForm = () => {
                   layout="vertical"
                   onFinish={onFinish}
                   className="loan-disbursement-form"
-                  onValuesChange={(changedValues) => {
-                    if (
-                      changedValues.loan_dsbrsmnt_amnt ||
-                      changedValues.loan_dsbrsmnt_intrst_amnt ||
-                      changedValues.loan_dsbrsmnt_prcsng_fee_amnt ||
-                      changedValues.loan_dsbrsmnt_tot_instlmnt
-                    ) {
-                      calculateAmountPerInstallment();
-                    }
-                  }}
                 >
                   <div className="loan-form-container">
                     {/* Customer and Date Row */}
@@ -459,7 +445,7 @@ const DisburseLoanForm = () => {
                             }}
                           />
                         </Form.Item>
-                        
+
                         {/* Hidden field to store customer ID */}
                         <Form.Item
                           name="loan_dsbrsmnt_cust_id"
@@ -486,9 +472,9 @@ const DisburseLoanForm = () => {
                             },
                           ]}
                         >
-                          <div style={{ 
-                            display: 'flex', 
-                            border: '1px solid #d9d9d9', 
+                          <div style={{
+                            display: 'flex',
+                            border: '1px solid #d9d9d9',
                             borderRadius: '6px',
                             overflow: 'hidden',
                             height: '40px',
@@ -598,6 +584,12 @@ const DisburseLoanForm = () => {
                             placeholder="Select Repayment Type"
                             allowClear
                             size="large"
+                            notFoundContent={
+                              <Empty
+                                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                description="No repayment types available"
+                              />
+                            }
                           >
                             {loanRepaymentTypes.map((type) => (
                               <Select.Option
@@ -721,17 +713,23 @@ const DisburseLoanForm = () => {
                         </Form.Item>
                       </div>
 
+                      {/* Installment Amount — fully manual, no auto-calculation */}
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_instlmnt_amnt"
                           label="Installment Amount"
+                          rules={[
+                            {
+                              required: true,
+                              message: "Please enter installment amount",
+                            },
+                          ]}
                         >
                           <InputNumber
                             style={{ width: "100%" }}
-                            placeholder="Auto-calculated"
+                            placeholder="Enter Installment Amount"
                             min={0}
                             precision={2}
-                            disabled
                             size="large"
                             prefix="₹"
                             addonBefore={
@@ -816,6 +814,12 @@ const DisburseLoanForm = () => {
                             allowClear
                             size="large"
                             onChange={handlePaymentModeChange}
+                            notFoundContent={
+                              <Empty
+                                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                description="No payment modes available"
+                              />
+                            }
                           >
                             {paymentModes.map((mode) => (
                               <Select.Option
@@ -835,7 +839,7 @@ const DisburseLoanForm = () => {
                       <>
                         <Divider style={{ borderTop: "1px solid #d9d9d9" }} />
                         <Divider orientation="center">Payment Split Details</Divider>
-                        
+
                         <div className="row mb-2">
                           <div className="col-md-6">
                             <Form.Item
@@ -913,7 +917,7 @@ const DisburseLoanForm = () => {
                             >
                               <TextArea
                                 placeholder="Enter cash payment remarks or details"
-                                autoSize={{ minRows: 2, maxRows: 6}}
+                                autoSize={{ minRows: 2, maxRows: 6 }}
                                 allowClear
                               />
                             </Form.Item>
@@ -940,7 +944,7 @@ const DisburseLoanForm = () => {
                     </div>
 
                     <Divider style={{ borderTop: "2px solid #d9d9d9" }} />
-                    
+
                     <div className="text-center mt-4">
                       <Space size="middle">
                         <Button

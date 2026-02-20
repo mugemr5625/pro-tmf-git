@@ -80,8 +80,9 @@
 .loan-accordion-card .ant-collapse-content {
   border-top: none !important;
 }
-.ant-typography.ant-typography-secondary{
-  color : black;
+
+.ant-typography.ant-typography-secondary {
+  color: black;
 }
 
 /* Summary Grid Styles - With proper spacing */
@@ -108,15 +109,42 @@
   display: block;
 }
 
-/* Tabs Container with padding */
+/* ======================
+   Tabs Card
+   ── Key fix: do NOT use overflow:hidden here — it clips the last tab label.
+   ── Also allow the tab nav bar to scroll horizontally on very small screens
+      instead of cutting off text.
+   ====================== */
 .loan-tabs-card {
   margin-bottom: 12px;
   border-radius: 8px;
-  overflow: hidden;
+  /* overflow: hidden; ← REMOVED — this was clipping the COMPLETED tab */
+  overflow: visible;
 }
 
+/* Let the Ant Design tab nav wrap/scroll rather than clip */
 .loan-tabs-card .ant-tabs-nav {
   padding-left: 8px;
+  /* Prevent the nav itself from cropping its children */
+  overflow: visible !important;
+}
+
+.loan-tabs-card .ant-tabs-nav-wrap {
+  /* Allow scroll on very narrow screens instead of clipping */
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.loan-tabs-card .ant-tabs-nav-list {
+  /* Give the last tab enough room — flex nowrap keeps all tabs in one line */
+  flex-wrap: nowrap;
+}
+
+/* Tab labels — uniform padding so no tab is cut off */
+.loan-tabs-card .ant-tabs-tab {
+  padding: 8px 12px !important;
+  white-space: nowrap;         /* Never wrap tab text */
+  overflow: visible !important;
 }
 
 /* Customer List Styles - Similar to ViewArea */
@@ -297,7 +325,6 @@
   }
 
   .loan-disbursement-title {
-    
     white-space: nowrap;
     margin-right: 8px;
   }
@@ -343,6 +370,16 @@
 
   .summary-value {
     font-size: 16px !important;
+  }
+
+  /* On mobile, allow the tabs to scroll horizontally if needed */
+  .loan-tabs-card .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+  }
+
+  /* Slightly smaller tab padding on mobile so all 3 fit */
+  .loan-tabs-card .ant-tabs-tab {
+    padding: 8px 8px !important;
   }
 }
 
@@ -465,14 +502,15 @@
 .loan-tabs-card {
   transition: top 0.3s ease, z-index 0.3s ease !important;
 }
-/* In DisburseLoanList.css */
+
+/* Scroll margin for infinite scroll items */
 .loan-customer-list-item-wrapper,
 .loan-mobile-item-wrapper {
-  scroll-margin-top: 210px; /* header(72px) + collapsed accordion(130px) + padding(10px) */
+  scroll-margin-top: 210px;
 }
 
 /* Adjust for when accordion is open */
 .accordion-open .loan-customer-list-item-wrapper,
 .accordion-open .loan-mobile-item-wrapper {
-  scroll-margin-top: 300px; /* Adjust based on open accordion height */
+  scroll-margin-top: 300px;
 }
