@@ -49,6 +49,7 @@ const AddCustomer = () => {
     const [isGettingLocation, setIsGettingLocation] = useState(false);
     const [locationTimer, setLocationTimer] = useState(0);
     const [timeTaken, setTimeTaken] = useState(null);
+    const watchIdRef = useRef(null);
 
     const [form] = Form.useForm();
     const params = useParams();
@@ -68,6 +69,14 @@ const [isScrolled, setIsScrolled] = useState(false);
         return null;
     };
 
+    // ✅ Add this useEffect near your other useEffects
+useEffect(() => {
+    return () => {
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+    };
+}, []);
     // Timer effect for location tracking
     useEffect(() => {
         let interval;
@@ -343,92 +352,122 @@ const handleLineChange = (lineId) => {
         }
         setMapModalVisible(true);
     };
+    const handleCancelLocation = () => {
+    if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+    }
+    setIsGettingLocation(false);
+    setLocationTimer(0);
+    setCurrentAccuracy(null);
 
-    const handleGetCurrentLocation = () => {
-        if (!navigator.geolocation) {
-            notification.error({
-                message: 'Geolocation Not Supported',
-                description: 'Your browser does not support geolocation.',
-            });
-            return;
+    notification.info({
+        message: 'Location Cancelled',
+        description: 'Location tracking has been stopped.',
+        duration: 3,
+    });
+};
+
+   const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+        notification.error({ message: 'Geolocation Not Supported' });
+        return;
+    }
+
+    // ✅ Clear any existing watch first
+    if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+    }
+
+    setIsGettingLocation(true);
+    setLocationTimer(0);
+    setTimeTaken(null);
+    setCurrentAccuracy(null);
+
+    const startTime = Date.now();
+
+    notification.info({
+        message: 'Getting Location',
+        description: 'Please allow location access and wait...',
+        duration: 4,
+    });
+
+    // ✅ Hard timeout safety net — stops after 60s with best result
+    const hardTimeoutRef = setTimeout(() => {
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
         }
-        setIsGettingLocation(true);
-        setLocationTimer(0);
-        setTimeTaken(null);
-        setCurrentAccuracy(null);
-
-        notification.info({
-            message: 'Getting Location',
-            description: 'Please allow location access and wait...',
-            duration: 4,
+        setIsGettingLocation(false);
+        notification.warning({
+            message: 'Location Timeout',
+            description: 'Used best available accuracy. Try outdoors for better results.',
+            duration: 5,
         });
-        const startTime = Date.now();
+    }, 60000);
 
-        // OPTIMIZED: Get high-accuracy position
-        const watchId = navigator.geolocation.watchPosition(
-            (position) => {
-                const { latitude, longitude, accuracy } = position.coords;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+            const { latitude, longitude, accuracy } = position.coords;
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-                console.log("Live Accuracy:", accuracy);
+            console.log(`⏱ ${elapsed}s | 📍 Accuracy: ${accuracy}m`);
 
-                // ✅ Only accept when accuracy is GOOD (≤ 5 meters)
-                if (accuracy <= 2) {
-                    const lat = latitude.toFixed(6);
-                    const lng = longitude.toFixed(6);
-                    const endTime = Date.now();
-                    const timeElapsed = Math.round((endTime - startTime) / 1000);
-                    
-                    setSelectedLocation({
-                        lat,
-                        lng,
-                        address: `${lat}, ${lng}`,
-                    });
+            // ✅ Always update map live
+            setSelectedLocation({
+                lat: latitude.toFixed(6),
+                lng: longitude.toFixed(6),
+                address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            });
+            setMapCenter({ lat: latitude, lng: longitude });
+            setCurrentAccuracy(accuracy);
 
-                    setMapCenter({ lat: latitude, lng: longitude });
-                    setCurrentAccuracy(accuracy);
-                    setTimeTaken(timeElapsed);
-                    setIsGettingLocation(false);
+            // ✅ Accept when accuracy ≤ 2m (your original target)
+            if (accuracy <= 2) {
+                clearTimeout(hardTimeoutRef);
 
-                    notification.success({
-                        message: "High Accuracy Location Locked ✅",
-                        description: `Accuracy: ${accuracy.toFixed(1)} meters | Time: ${timeElapsed}s`,
-                        duration: 5,
-                    });
-
-                    // ✅ Stop tracking once good accuracy is achieved
-                    navigator.geolocation.clearWatch(watchId);
-                } else {
-                    // Keep updating marker live while accuracy improves
-                    setSelectedLocation({
-                        lat: latitude.toFixed(6),
-                        lng: longitude.toFixed(6),
-                        address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-                    });
-
-                    setMapCenter({ lat: latitude, lng: longitude });
-                    setCurrentAccuracy(accuracy);
+                // ✅ Use ref to reliably clear watch
+                if (watchIdRef.current !== null) {
+                    navigator.geolocation.clearWatch(watchIdRef.current);
+                    watchIdRef.current = null;
                 }
-            },
-            (error) => {
+
+                setTimeTaken(elapsed);
                 setIsGettingLocation(false);
-                let errorMessage = "Unable to get location";
-                if (error.code === 1) errorMessage = "Location permission denied";
-                if (error.code === 2) errorMessage = "Location unavailable";
-                if (error.code === 3) errorMessage = "Location request timeout";
 
-                notification.error({
-                    message: "GPS Error",
-                    description: errorMessage,
+                notification.success({
+                    message: 'High Accuracy Location Locked ✅',
+                    description: `Accuracy: ${accuracy.toFixed(1)}m | Time: ${elapsed}s`,
+                    duration: 5,
                 });
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 20000,
-                maximumAge: 0,
             }
-        );
-    };
+        },
+        (error) => {
+            clearTimeout(hardTimeoutRef);
+            if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+            }
+            setIsGettingLocation(false);
 
+            const msgs = {
+                1: 'Location permission denied',
+                2: 'Location unavailable',
+                3: 'Location request timeout',
+            };
+            notification.error({
+                message: 'GPS Error',
+                description: msgs[error.code] || 'Unable to get location',
+            });
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0,
+        }
+    );
+};
     const handleMapClick = (e) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
@@ -1340,7 +1379,11 @@ const handleLineChange = (lineId) => {
     className={`custom-tabs ${isScrolled ? 'tabs-scrolled' : ''}`}
 />
                             {/* Fullscreen Loading Overlay - Freezes entire page */}
-                            <LocationLoadingOverlay visible={isGettingLocation} timer={locationTimer} />
+                           <LocationLoadingOverlay 
+    visible={isGettingLocation} 
+    timer={locationTimer}
+    onCancel={handleCancelLocation}  // ✅ add this
+/>
 
                             <Modal
                                 title={

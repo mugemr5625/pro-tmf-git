@@ -30,6 +30,10 @@ import DisburseLoanForm from 'pages/Organization/DisburseLoan/DisburseLoanForm';
 import DisburseLoanList from 'pages/Organization/DisburseLoan/DisburseLoanList';
 import Location from 'pages/Organization/Location/Location';
 
+// ── Organization (Firm) module ────────────────────────────────────────────────
+import AddOrganization from 'pages/Organization/Organization/AddOrganization';
+import ViewOrganization from 'pages/Organization/Organization/ViewOrganization';
+
 //User Module
 import AddUser from 'pages/Users/AddUser';
 import ListUser from 'pages/Users/ListUser';
@@ -93,6 +97,11 @@ const authProtectedRoutes = [
   { path: '/add-customer', component: <AddCustomer /> },
   { path: '/customer/edit/:id', component: <AddCustomer /> },
   { path: '/view-customer', component: <ViewCustomer /> },
+
+  // ── Organization (Firm) ──────────────────────────────────────────────────
+  { path: '/organization/list', component: <ViewOrganization /> },
+  { path: '/organization/add', component: <AddOrganization /> },
+  { path: '/organization/edit/:id', component: <AddOrganization /> },
 ];
 
 const publicRoutes = [

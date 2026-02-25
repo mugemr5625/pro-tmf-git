@@ -766,38 +766,30 @@ const AddBranch = () => {
       <div className="add-branch-page-content">
 
         {/* ── Title bar — flex-shrink:0, never scrolls ── */}
-      {/* ── Scrollable body — only this scrolls ── */}
-<div className="add-branch-scroll-body" ref={scrollRef}>
-  <Form form={form} layout="vertical" style={{ padding: 0 }}>
-    <Tabs
-      activeKey={activeTab}
-      onChange={handleTabChange}
-      items={tabItems}
-      size="large"
-      type="card"
-      className="custom-tabs"
-      style={{ marginTop: 0, background: '#fff' }}
-      renderTabBar={(props, DefaultTabBar) => (
         <div
+          className="add-branch-header"
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 1000,
-            backgroundColor: "#fff",
-            boxShadow: isScrolled ? "0 2px 8px rgba(0,0,0,0.10)" : "none",
-            transition: "box-shadow 0.3s ease",
+            boxShadow: isScrolled ? '0 2px 8px rgba(0,0,0,0.10)' : 'none',
           }}
         >
-          <div style={{ paddingBottom: "8px" }}>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
-              {params.id ? "Edit Branch" : "Add Branch"}
-            </h2>
-          </div>
-          <DefaultTabBar {...props} />
+          <h2 className="add-branch-title">
+            {params.id ? 'Edit Branch' : 'Add Branch'}
+          </h2>
         </div>
-      )}
-    />
-  </Form>
+
+        {/* ── Scrollable body — only this scrolls ── */}
+        <div className="add-branch-scroll-body" ref={scrollRef}>
+          <Form form={form} layout="vertical" style={{ padding: 0 }}>
+            <Tabs
+              activeKey={activeTab}
+              onChange={handleTabChange}
+              items={tabItems}
+              size="large"
+              type="card"
+              className="custom-tabs"
+              style={{ marginTop: 0, background: '#fff' }}
+            />
+          </Form>
           <ToastContainer />
         </div>
 

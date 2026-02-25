@@ -40,6 +40,7 @@ import rightIcon from "../../assets/icons/sidebar.png"
 import leftIcon from "../../assets/icons/hide.png"
 import "./VerticalLayout.css";
 import { FloatButton } from 'antd';
+import firmIcon from "../../assets/icons/government.png"
 
 
 const { Header, Sider, Content } = Layout;
@@ -345,7 +346,7 @@ const VerticalLayout = (props) => {
       icon: <img src={settingsIcon} style={{ filter: isMobile ? 'none' : 'invert(1)'}}/>,
       label: 'Settings',
       children: [
-        { key: '/view', icon: <img src={organizationIcon} style={{ filter: isMobile ? 'none' : 'invert(1)'}}/>, label: 'Organization' },
+        { key: '/organization/list', icon: <img src={organizationIcon} style={{ filter: isMobile ? 'none' : 'invert(1)'}}/>, label: 'Organization' },
         { key: '/branch/list', icon: <img src={branchIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Branch' },
         { key: '/line', icon: <img src={lineIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Line' },
         { key: '/area', icon: <img src={areaIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Area' },

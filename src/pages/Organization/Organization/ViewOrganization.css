@@ -1,0 +1,259 @@
+/* ViewOrganization Component Styles */
+
+.view-org-page-content {
+  padding: 0;
+  margin: 0;
+}
+
+.view-org-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+}
+
+.view-org-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.view-org-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.view-org-scrollable-div {
+  height: 500px;
+  width: auto;
+  overflow: auto;
+  margin-top: 20px;
+}
+
+.view-org-search-results {
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-org-group {
+  margin-bottom: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+}
+
+.view-org-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 5px 10px 10px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.view-org-group-title-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-org-group-title {
+  font-weight: 600;
+  font-size: 22px;
+  color: #262626;
+}
+
+.view-org-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 19px;
+  background-color: #fff !important;
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+  font-size: 22px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.2s;
+  margin-right: 20px;
+}
+
+.view-org-badge-search {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.view-org-list-container {
+  max-height: 400px;
+  overflow: auto;
+  padding: 0;
+  margin: 0;
+}
+
+.view-org-list {
+  background: #fafafa;
+  margin: 0;
+}
+
+.view-org-list-item-wrapper {
+  border-bottom: 2px solid #f0f0f0;
+  padding: 0 !important;
+  background: #fff;
+}
+
+.view-org-list-item {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  cursor: default;
+  padding: 12px 20px;
+}
+
+.view-org-list-item-expanded {
+  background: #f9f9f9;
+}
+
+.view-org-avatar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.view-org-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 4px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background-color: #fff !important;
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+  font-size: 20px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.2s;
+}
+
+.view-org-item-title-container {
+  margin-left: 8px;
+  margin-right: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.view-org-item-title {
+  font-weight: 600;
+  color: black;
+  font-size: 20px;
+}
+
+.view-org-ellipsis-icon {
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  margin-right: 24px;
+}
+
+.view-org-ellipsis-icon:hover {
+  color: #1890ff;
+}
+
+.view-org-collapse-content {
+  margin-top: 6px;
+  padding: 0;
+  background: #f9f9f9;
+}
+
+.view-org-skeleton-container {
+  text-align: center;
+  padding: 16px;
+}
+
+.view-org-divider-container {
+  margin: 16px 0;
+}
+
+.view-org-divider-star {
+  color: red;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.view-org-divider-text {
+  color: #595959;
+  font-size: 14px;
+}
+
+.view-org-no-data {
+  text-align: center;
+  padding: 40px;
+  color: #8c8c8c;
+}
+
+.view-org-float-button {
+  right: 24px;
+  bottom: 24px;
+  position: fixed;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.view-org-search-modal-title {
+  text-align: center;
+  width: 100%;
+}
+
+.view-org-search-modal-label {
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.view-org-search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  outline: none;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .view-org-group-header {
+    padding: 10px 5px;
+  }
+
+  .view-org-title {
+    font-size: 22px;
+  }
+
+  .view-org-group-title {
+    font-size: 22px;
+  }
+
+  .view-org-list-item {
+    padding: 10px 12px;
+  }
+
+  .view-org-scrollable-div {
+    height: calc(100vh - 250px);
+  }
+
+  .view-org-badge {
+    margin-right: 5px;
+    font-size: 20px;
+    height: 35px;
+    min-width: 35px;
+  }
+}

@@ -1,0 +1,70 @@
+/* ======================
+   AddOrganization Component Styles
+   ====================== */
+
+.add-org-form-container {
+  padding: 24px;
+}
+
+.add-org-title {
+  margin: 0 !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  color: #1f1f1f;
+  white-space: nowrap;
+}
+
+/* ── Tab nav — remove gap between tabs and form ── */
+.custom-tabs .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.custom-tabs .ant-tabs-content-holder {
+  padding: 0 !important;
+}
+
+.custom-tabs .ant-tabs-tab {
+  transition: all 0.3s ease;
+}
+
+.custom-tabs .ant-tabs-tab-active {
+  background-color: #1677ff !important;
+  border-color: #1677ff !important;
+}
+
+.custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #ffffff !important;
+}
+
+.custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn span {
+  color: #ffffff !important;
+}
+
+.custom-tabs .ant-tabs-tab:hover {
+  background-color: #e8f5e9;
+}
+
+.custom-tabs .ant-tabs-tab-active:hover {
+  background-color: #1677ff !important;
+}
+
+.ant-tabs-ink-bar {
+  background-color: #1677ff;
+  height: 3px;
+}
+
+/* ── Partner row ── */
+.partner-row {
+  background: #fafafa;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .add-org-form-container {
+    padding: 12px;
+  }
+}
