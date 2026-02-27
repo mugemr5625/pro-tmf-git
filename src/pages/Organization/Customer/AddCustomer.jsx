@@ -394,18 +394,31 @@ const handleLineChange = (lineId) => {
     });
 
     // ✅ Hard timeout safety net — stops after 60s with best result
-    const hardTimeoutRef = setTimeout(() => {
-        if (watchIdRef.current !== null) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
+   const hardTimeoutRef = setTimeout(() => {
+    if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+    }
+    setIsGettingLocation(false);
+
+    // Use whatever accuracy was achieved — selectedLocation is already updated live
+    setCurrentAccuracy(prev => {
+        if (prev !== null) {
+            notification.warning({
+                message: 'Location Saved with Best Available Accuracy',
+                description: `Could not achieve ≤2m. Best accuracy achieved: ${prev.toFixed(1)}m. Location has been set.`,
+                duration: 6,
+            });
+        } else {
+            notification.error({
+                message: 'Location Timeout',
+                description: 'Could not get any location. Please try again outdoors.',
+                duration: 5,
+            });
         }
-        setIsGettingLocation(false);
-        notification.warning({
-            message: 'Location Timeout',
-            description: 'Used best available accuracy. Try outdoors for better results.',
-            duration: 5,
-        });
-    }, 60000);
+        return prev; // keep the current accuracy value unchanged
+    });
+}, 60000);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
