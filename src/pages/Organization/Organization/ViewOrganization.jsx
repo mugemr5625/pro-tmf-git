@@ -14,38 +14,41 @@ import {
 import OrganizationCollapseContent from "components/Common/OrganizationCollapseContent";
 import { FloatButton } from "antd";
 import InfiniteScroll from "react-infinite-scroll-component";
-// import orgIcon from "../../../assets/icons/organization.png"; // adjust path as needed
 import "./ViewOrganization.css";
 
-const ORGANIZATION_API = "/api/organization/";
-const PAGE_SIZE = 10;
+const ORGANIZATION_API          = "/api/organization/";
+const ORGANIZATION_DOCUMENTS_API = "/api/organization-documents/";
+const PAGE_SIZE        = 10;
 const MAX_VISIBLE_ITEMS = 8;
-const ITEM_HEIGHT = 20;
+const ITEM_HEIGHT       = 20;
 
 const ViewOrganization = () => {
   const navigate = useNavigate();
-  const [tableData, setTableData] = useState([]);
+  const [tableData,    setTableData]    = useState([]);
   const [originalData, setOriginalData] = useState([]);
-  const [tableLoader, setTableLoader] = useState(false);
+  const [tableLoader,  setTableLoader]  = useState(false);
   const [deleteLoader, setDeleteLoader] = useState(false);
 
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const [showReset, setShowReset] = useState(false);
+  const [searchText,         setSearchText]         = useState("");
+  const [showReset,          setShowReset]          = useState(false);
 
-  const [expandedItems, setExpandedItems] = useState({});
-  const [openSwipeId, setOpenSwipeId] = useState(null);
-  const [pagination, setPagination] = useState({ displayed: PAGE_SIZE, total: 0 });
+  const [expandedItems,  setExpandedItems]  = useState({});
+  const [openSwipeId,    setOpenSwipeId]    = useState(null);
+  const [pagination,     setPagination]     = useState({ displayed: PAGE_SIZE, total: 0 });
+
+  // ── Documents state: { [orgId]: { loading, data } } ──────────────────────
+  const [orgDocuments, setOrgDocuments] = useState({});
 
   const { useBreakpoint } = Grid;
-  const screens = useBreakpoint();
+  const screens  = useBreakpoint();
   const isMobile = !screens.md;
 
   useEffect(() => {
     getOrganizationList();
   }, []);
 
-  // ── Fetch list ────────────────────────────────────────────────────────────
+  // ── Fetch org list ────────────────────────────────────────────────────────
   const getOrganizationList = async () => {
     try {
       setTableLoader(true);
@@ -64,6 +67,25 @@ const ViewOrganization = () => {
       setOriginalData([]);
     } finally {
       setTableLoader(false);
+    }
+  };
+
+  // ── Fetch documents for a specific org (lazy — only when expanded) ────────
+  const fetchOrgDocuments = async (orgId) => {
+    // Skip if already loaded or loading
+    if (orgDocuments[orgId]) return;
+
+    setOrgDocuments((prev) => ({ ...prev, [orgId]: { loading: true, data: [] } }));
+    try {
+      const response = await GET(`${ORGANIZATION_DOCUMENTS_API}?organization_id=${orgId}`);
+      if (response?.status === 200) {
+        const docs = Array.isArray(response.data) ? response.data : [];
+        setOrgDocuments((prev) => ({ ...prev, [orgId]: { loading: false, data: docs } }));
+      } else {
+        setOrgDocuments((prev) => ({ ...prev, [orgId]: { loading: false, data: [] } }));
+      }
+    } catch (error) {
+      setOrgDocuments((prev) => ({ ...prev, [orgId]: { loading: false, data: [] } }));
     }
   };
 
@@ -106,19 +128,16 @@ const ViewOrganization = () => {
       notification.info({ message: "Reset Search", description: "Showing all organizations." });
       return;
     }
-
     const filtered = originalData.filter((item) => {
       const firmName = (item.firm_name || "").toLowerCase();
-      const place = (item.place || "").toLowerCase();
+      const place    = (item.place    || "").toLowerCase();
       const district = (item.district || "").toLowerCase();
       return firmName.includes(query) || place.includes(query) || district.includes(query);
     });
-
     setTableData(filtered);
     setPagination({ displayed: Math.min(PAGE_SIZE, filtered.length), total: filtered.length });
     setSearchModalVisible(false);
     setShowReset(true);
-
     if (filtered.length === 0) {
       notification.warning({ message: "No Results", description: `No matches found for "${searchText}".` });
     }
@@ -140,18 +159,20 @@ const ViewOrganization = () => {
     }));
   };
 
-  // ── Expand toggle ─────────────────────────────────────────────────────────
+  // ── Expand toggle — fetch documents on first expand ───────────────────────
   const handleExpandToggle = (id) => {
     setOpenSwipeId(null);
     setExpandedItems((prev) => {
-      const newState = { [id]: !prev[id] };
-      if (newState[id]) {
+      const isNowExpanded = !prev[id];
+      if (isNowExpanded) {
+        // Lazy-load documents when expanding
+        fetchOrgDocuments(id);
         setTimeout(() => {
           const el = document.getElementById(`org-item-${id}`);
           if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
         }, 100);
       }
-      return newState;
+      return { [id]: isNowExpanded };
     });
   };
 
@@ -163,10 +184,10 @@ const ViewOrganization = () => {
   const handleEdit = (record) => navigate(`/organization/edit/${record.id}`);
 
   // ── Padding for last expanded item ────────────────────────────────────────
-  const lastItem = tableData[tableData.length - 1];
-  const isLastExpanded = lastItem ? expandedItems[lastItem.id] : false;
-  const expandedCount = tableData.filter((item) => expandedItems[item.id]).length;
-  const paddingBottom = isLastExpanded ? Math.max(MAX_VISIBLE_ITEMS - expandedCount, 0) * ITEM_HEIGHT : 0;
+  const lastItem        = tableData[tableData.length - 1];
+  const isLastExpanded  = lastItem ? expandedItems[lastItem.id] : false;
+  const expandedCount   = tableData.filter((item) => expandedItems[item.id]).length;
+  const paddingBottom   = isLastExpanded ? Math.max(MAX_VISIBLE_ITEMS - expandedCount, 0) * ITEM_HEIGHT : 0;
 
   return (
     <div className="view-org-page-content">
@@ -214,14 +235,16 @@ const ViewOrganization = () => {
           </div>
         )}
 
-        {/* Group header (single group — no line grouping for org) */}
         {tableData.length > 0 && (
           <div className="view-org-group" style={{ paddingBottom }}>
-            {/* Count badge header */}
             <div className="view-org-group-header">
               <div className="view-org-group-title-container">
-                <Image preview={false}  width={30} height={30} //src={orgIcon}
-                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E" />
+                <Image
+                  preview={false}
+                  width={30}
+                  height={30}
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E"
+                />
                 <span className="view-org-group-title">Organizations</span>
               </div>
               <div className={showReset ? "view-org-badge view-org-badge-search" : "view-org-badge"}>
@@ -253,8 +276,9 @@ const ViewOrganization = () => {
                   dataSource={tableData.slice(0, pagination.displayed)}
                   className="view-org-list"
                   renderItem={(record, index) => {
-                    const isExpanded = expandedItems[record.id];
-                    const lineIndex = index + 1;
+                    const isExpanded   = expandedItems[record.id];
+                    const lineIndex    = index + 1;
+                    const docState     = orgDocuments[record.id] || { loading: false, data: [] };
 
                     return (
                       <div key={record.id} id={`org-item-${record.id}`} className="view-org-list-item-wrapper">
@@ -264,12 +288,19 @@ const ViewOrganization = () => {
                             index={record.id}
                             titleKey="firm_name"
                             name="organization"
-                            // avatarSrc={orgIcon}
                             onSwipeRight={!isExpanded ? () => handleEdit(record) : undefined}
-                            onSwipeLeft={!isExpanded ? () => onDelete(record) : undefined}
+                            onSwipeLeft={!isExpanded  ? () => onDelete(record)  : undefined}
                             isExpanded={isExpanded}
                             onExpandToggle={() => handleExpandToggle(record.id)}
-                            renderContent={() => isExpanded ? <OrganizationCollapseContent org={record} /> : null}
+                            renderContent={() =>
+                              isExpanded ? (
+                                <OrganizationCollapseContent
+                                  org={record}
+                                  documents={docState.data}
+                                  documentsLoading={docState.loading}
+                                />
+                              ) : null
+                            }
                             isSwipeOpen={openSwipeId === record.id}
                             onSwipeStateChange={(isOpen) => handleSwipeStateChange(record.id, isOpen)}
                           />
@@ -284,7 +315,8 @@ const ViewOrganization = () => {
                                   </div>
                                 }
                                 title={
-                                  <div onClick={() => handleExpandToggle(record.id)}
+                                  <div
+                                    onClick={() => handleExpandToggle(record.id)}
                                     className="view-org-item-title-container">
                                     <span className="view-org-item-title">{record.firm_name}</span>
                                     <Dropdown
@@ -328,7 +360,11 @@ const ViewOrganization = () => {
 
                             {isExpanded && (
                               <div className="view-org-collapse-content">
-                                <OrganizationCollapseContent org={record} />
+                                <OrganizationCollapseContent
+                                  org={record}
+                                  documents={docState.data}
+                                  documentsLoading={docState.loading}
+                                />
                               </div>
                             )}
                           </>

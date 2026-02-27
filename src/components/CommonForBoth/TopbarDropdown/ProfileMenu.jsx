@@ -26,6 +26,7 @@ function ProfileMenu(props) {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [userRole, setUserRole] = useState("");
   const [fontSize, setFontSize] = useState('m');
+  const [orgName, setOrgName] = useState('');
   
 
   const navigate = useNavigate();
@@ -99,6 +100,10 @@ function ProfileMenu(props) {
     if (localStorage.getItem("authUser")) {
       const obj = JSON.parse(localStorage.getItem("authUser"));
       setUser(obj);
+      const storedOrgName = localStorage.getItem("org_name");
+if (storedOrgName) {
+  setOrgName(storedOrgName);
+}
     }
 
     const storedBranch = localStorage.getItem("selected_branch_name");
@@ -162,7 +167,7 @@ function ProfileMenu(props) {
                 {user.username}
               </div>
               <div style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>
-                {user.orgName ? user.orgName : "TMF"} • {user.employees?.length > 0 ? user.employees[0].branch_name : 'Main Branch'}
+                {orgName || user.orgName || "TMF"} • {user.employees?.length > 0 ? user.employees[0].branch_name : 'Main Branch'}
               </div>
             </div>
           </div>

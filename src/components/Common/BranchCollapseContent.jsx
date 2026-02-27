@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Descriptions, Modal, Button, Alert, Spin } from "antd";
+import { Descriptions, Modal, Button, Alert, Spin, Tag } from "antd";
 import pdfIcon from "../../assets/icons/pdf.png";
 import imageIcon from "../../assets/icons/image.png";
 import excelIcon from "../../assets/icons/excel.png";
@@ -8,7 +8,6 @@ import defaultIcon from "../../assets/icons/default.png";
 import "./BranchCollapseContent.css";
 
 // ========== SECURITY CONFIGURATION ==========
-// Google Cloud Storage domains
 const ALLOWED_DOMAINS = [
   'storage.googleapis.com',
   'storage.cloud.google.com',
@@ -16,37 +15,22 @@ const ALLOWED_DOMAINS = [
 
 const BLOCKED_EXTENSIONS = ['svg', 'xml', 'html', 'htm', 'js', 'exe', 'bat', 'sh', 'scr', 'vbs'];
 const BLOCKED_MIME_TYPES = [
-  'image/svg+xml',
-  'text/html',
-  'application/javascript',
-  'application/x-javascript',
-  'text/xml',
-  'application/x-msdownload',
-  'application/x-sh'
+  'image/svg+xml', 'text/html', 'application/javascript',
+  'application/x-javascript', 'text/xml', 'application/x-msdownload', 'application/x-sh'
 ];
 
 // ========== SECURITY UTILITIES ==========
 const isUrlSafe = (url) => {
   try {
     const urlObj = new URL(url);
+    if (urlObj.protocol !== 'https:') return { safe: false, reason: 'Only HTTPS URLs are allowed' };
 
-    // Only allow HTTPS
-    if (urlObj.protocol !== 'https:') {
-      return { safe: false, reason: 'Only HTTPS URLs are allowed' };
-    }
-
-    // Check against allowlist
     const isAllowed = ALLOWED_DOMAINS.some(domain =>
       urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`)
     );
-
-    if (!isAllowed) {
-      return { safe: false, reason: 'URL not from trusted domain' };
-    }
+    if (!isAllowed) return { safe: false, reason: 'URL not from trusted domain' };
 
     if (urlObj.hostname.includes('googleapis.com')) {
-      
-      // ✅ V4 signed URL (GOOG4-RSA-SHA256) — what your API returns
       const isV4 =
         urlObj.searchParams.has('X-Goog-Algorithm') &&
         urlObj.searchParams.has('X-Goog-Credential') &&
@@ -54,50 +38,30 @@ const isUrlSafe = (url) => {
         urlObj.searchParams.has('X-Goog-Date') &&
         urlObj.searchParams.has('X-Goog-Expires');
 
-      // ✅ V2 signed URL (legacy)
       const isV2 =
         urlObj.searchParams.has('Expires') &&
         urlObj.searchParams.has('GoogleAccessId') &&
         urlObj.searchParams.has('Signature');
 
-      if (!isV4 && !isV2) {
-        return { safe: false, reason: 'Invalid signed URL format' };
-      }
+      if (!isV4 && !isV2) return { safe: false, reason: 'Invalid signed URL format' };
 
-      // Check expiration for V4
       if (isV4) {
-        const googleDate = urlObj.searchParams.get('X-Goog-Date'); // e.g. 20260218T085234Z
-        const expiresSeconds = parseInt(urlObj.searchParams.get('X-Goog-Expires')); // e.g. 3600
-
+        const googleDate    = urlObj.searchParams.get('X-Goog-Date');
+        const expiresSeconds = parseInt(urlObj.searchParams.get('X-Goog-Expires'));
         if (googleDate && !isNaN(expiresSeconds)) {
-          // Parse YYYYMMDDTHHMMSSZ format
-          const year   = parseInt(googleDate.slice(0, 4));
-          const month  = parseInt(googleDate.slice(4, 6)) - 1;
-          const day    = parseInt(googleDate.slice(6, 8));
-          const hour   = parseInt(googleDate.slice(9, 11));
-          const minute = parseInt(googleDate.slice(11, 13));
-          const second = parseInt(googleDate.slice(13, 15));
-
-          const issuedAt = Date.UTC(year, month, day, hour, minute, second);
+          const year = parseInt(googleDate.slice(0, 4)), month = parseInt(googleDate.slice(4, 6)) - 1,
+                day  = parseInt(googleDate.slice(6, 8)), hour  = parseInt(googleDate.slice(9, 11)),
+                min  = parseInt(googleDate.slice(11, 13)), sec  = parseInt(googleDate.slice(13, 15));
+          const issuedAt  = Date.UTC(year, month, day, hour, min, sec);
           const expiresAt = issuedAt + expiresSeconds * 1000;
-          const now = Date.now();
-
-          if (now > expiresAt) {
-            return { safe: false, reason: 'Signed URL has expired' };
-          }
+          if (Date.now() > expiresAt) return { safe: false, reason: 'Signed URL has expired' };
         }
       }
-
-      // Check expiration for V2
       if (isV2) {
         const expires = parseInt(urlObj.searchParams.get('Expires'));
-        const now = Math.floor(Date.now() / 1000);
-        if (expires < now) {
-          return { safe: false, reason: 'Signed URL has expired' };
-        }
+        if (expires < Math.floor(Date.now() / 1000)) return { safe: false, reason: 'Signed URL has expired' };
       }
     }
-
     return { safe: true };
   } catch (e) {
     return { safe: false, reason: 'Invalid URL format' };
@@ -106,65 +70,47 @@ const isUrlSafe = (url) => {
 
 const getFileTypeFromUrl = (url) => {
   if (!url) return "unknown";
-  
-  // For signed URLs, extract the actual filename before query params
-  const cleanUrl = url.split("?")[0].toLowerCase();
-  const pathParts = cleanUrl.split('/');
-  const filename = pathParts[pathParts.length - 1];
-  const extension = filename.split('.').pop();
-  
-  // Block dangerous extensions
-  if (BLOCKED_EXTENSIONS.includes(extension)) {
-    return "blocked";
-  }
-  
+  const cleanUrl   = url.split("?")[0].toLowerCase();
+  const pathParts  = cleanUrl.split('/');
+  const filename   = pathParts[pathParts.length - 1];
+  const extension  = filename.split('.').pop();
+  if (BLOCKED_EXTENSIONS.includes(extension)) return "blocked";
   if (extension === 'pdf') return "pdf";
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(extension)) return "image";
   if (['xls', 'xlsx', 'csv'].includes(extension)) return "excel";
   if (['doc', 'docx'].includes(extension)) return "word";
   if (['mp4', 'mov', 'avi', 'webm'].includes(extension)) return "video";
-  
   return "unknown";
 };
 
 const verifyContentType = async (url) => {
   try {
-    // For signed URLs, we'll skip HEAD request due to CORS
-    // Instead rely on file extension and let browser handle loading
     const extension = getFileTypeFromUrl(url);
-    
-    if (extension === "blocked") {
-      return { safe: false, reason: 'Blocked file type for security' };
-    }
-    
-    // Return the type based on extension
-    return { 
-      safe: true, 
-      type: extension,
-      skipVerification: true // Flag that we skipped server verification
-    };
-    
+    if (extension === "blocked") return { safe: false, reason: 'Blocked file type for security' };
+    return { safe: true, type: extension, skipVerification: true };
   } catch (error) {
-    console.error('Content-Type verification failed:', error);
     return { safe: true, type: 'unknown', warning: 'Could not verify file type' };
   }
 };
 
-// ========== SECURE PREVIEW COMPONENTS ==========
-const SecureImagePreview = ({ url }) => {
-  const [imageError, setImageError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+// ========== DESCRIPTION CAPTION ==========
+// Centered description shown below image / PDF
+const DescriptionCaption = ({ text }) =>
+  text ? (
+    <div style={{ textAlign: "center", marginTop: 10, fontSize: 14, color: "#555", fontStyle: "italic" }}>
+      {text}
+    </div>
+  ) : null;
 
-  // Force timeout after 10 seconds
+// ========== SECURE PREVIEW COMPONENTS ==========
+const SecureImagePreview = ({ url, description }) => {
+  const [imageError, setImageError] = useState(false);
+  const [isLoading,  setIsLoading]  = useState(true);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (isLoading) {
-        console.warn("Image load timeout:", url);
-        setImageError(true);
-        setIsLoading(false);
-      }
-    }, 10000); // 10 seconds
-
+      if (isLoading) { setImageError(true); setIsLoading(false); }
+    }, 10000);
     return () => clearTimeout(timer);
   }, [isLoading]);
 
@@ -172,133 +118,87 @@ const SecureImagePreview = ({ url }) => {
     return (
       <Alert
         message="Failed to load image"
-        description={
-          <>
-            <p>The image could not be displayed.</p>
-            <Button 
-              type="primary"
-              onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-            >
-              Open in New Tab
-            </Button>
-          </>
-        }
-        type="warning"
-        showIcon
+        description={<><p>The image could not be displayed.</p><Button type="primary" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}>Open in New Tab</Button></>}
+        type="warning" showIcon
       />
     );
   }
 
   return (
     <div className="secure-image-container">
-      {isLoading && (
-        <div style={{ textAlign: "center", padding: 40 }}>
-          <Spin tip="Loading image..." />
-        </div>
-      )}
-
+      {isLoading && <div style={{ textAlign: "center", padding: 40 }}><Spin tip="Loading image..." /></div>}
       <img
         src={url}
-        alt="Preview"
+        alt={description || "Preview"}
         className="image-preview"
-        onError={() => {
-          console.error("Image failed:", url);
-          setImageError(true);
-          setIsLoading(false);
-        }}
-        onLoad={() => {
-          console.log("Image loaded:", url);
-          setIsLoading(false);
-        }}
-        style={{
-          display: isLoading ? "none" : "block",
-          maxWidth: "100%",
-          height: "auto",
-        }}
+        onError={() => { setImageError(true); setIsLoading(false); }}
+        onLoad={() => setIsLoading(false)}
+        style={{ display: isLoading ? "none" : "block", maxWidth: "100%", height: "auto" }}
       />
+      <DescriptionCaption text={description} />
     </div>
   );
 };
 
-
-const SecurePDFPreview = ({ url }) => {
-  const [pdfError, setPdfError] = useState(false);
+const SecurePDFPreview = ({ url, description }) => {
+  const [pdfError,        setPdfError]        = useState(false);
   const [useGoogleViewer, setUseGoogleViewer] = useState(false);
 
-  // Google Docs Viewer can sometimes bypass CORS issues
   const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
 
   return (
     <div className="secure-pdf-container">
-      {/* <Alert
-        message="PDF Document"
-        description="If the preview doesn't load, click the button below to open in a new tab."
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-      /> */}
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-        <Button 
-          type="primary" 
-          onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-        >
+        <Button type="primary" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
           Open PDF in New Tab
         </Button>
         {pdfError && !useGoogleViewer && (
-          <Button 
-            onClick={() => setUseGoogleViewer(true)}
-          >
-            Try Google Viewer
-          </Button>
+          <Button onClick={() => setUseGoogleViewer(true)}>Try Google Viewer</Button>
         )}
       </div>
-      
+
       {!pdfError && !useGoogleViewer ? (
         <iframe
           src={url}
-          title="PDF Preview"
+          title={description || "PDF Preview"}
           width="100%"
           height="500px"
           className="pdf-preview"
           style={{ border: '1px solid #d9d9d9', borderRadius: 4 }}
-          onError={() => {
-            console.error('PDF iframe failed to load');
-            setPdfError(true);
-          }}
+          onError={() => { console.error('PDF iframe failed'); setPdfError(true); }}
         />
       ) : useGoogleViewer ? (
         <iframe
           src={googleViewerUrl}
-          title="PDF Preview (Google Viewer)"
+          title={description || "PDF Preview (Google Viewer)"}
           width="100%"
           height="500px"
           className="pdf-preview"
           style={{ border: '1px solid #d9d9d9', borderRadius: 4 }}
-          onError={() => {
-            console.error('Google Viewer also failed');
-            setPdfError(true);
-            setUseGoogleViewer(false);
-          }}
+          onError={() => { setPdfError(true); setUseGoogleViewer(false); }}
         />
       ) : (
         <Alert
           message="PDF preview unavailable"
           description="The PDF could not be embedded due to CORS restrictions. Please use the button above to open it in a new tab."
-          type="warning"
-          showIcon
+          type="warning" showIcon
         />
       )}
+
+      <DescriptionCaption text={description} />
     </div>
   );
 };
 
 // ========== MAIN COMPONENT ==========
 const BranchCollapseContent = ({ branch, details, documents = [], documentsLoading = false }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [fileType, setFileType] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationError, setVerificationError] = useState(null);
+  const [isModalOpen,         setIsModalOpen]         = useState(false);
+  const [selectedFile,        setSelectedFile]        = useState(null);
+  const [selectedDocType,     setSelectedDocType]     = useState("");     // ← modal title
+  const [selectedDescription, setSelectedDescription] = useState("");     // ← caption below preview
+  const [fileType,            setFileType]            = useState("");
+  const [isVerifying,         setIsVerifying]         = useState(false);
+  const [verificationError,   setVerificationError]   = useState(null);
   const [verificationWarning, setVerificationWarning] = useState(null);
 
   if (!branch || !details) {
@@ -309,69 +209,42 @@ const BranchCollapseContent = ({ branch, details, documents = [], documentsLoadi
     );
   }
 
-  const agreementCerts = Array.isArray(details?.agreement_certificate)
-    ? details.agreement_certificate
-    : [];
-  const additionalCerts = Array.isArray(details?.additional_details)
-    ? details.additional_details
-    : [];
-
   const truncateText = (text, maxLength = 13) =>
-    !text
-      ? "No description available"
-      : text.length > maxLength
-        ? `${text.slice(0, maxLength)}...`
-        : text;
+    !text ? "No description available" : text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 
   const getFileIcon = (url) => {
     const type = getFileTypeFromUrl(url);
     switch (type) {
-      case "pdf": return pdfIcon;
+      case "pdf":   return pdfIcon;
       case "image": return imageIcon;
-      case "word": return wordIcon;
+      case "word":  return wordIcon;
       case "excel": return excelIcon;
-      default: return defaultIcon;
+      default:      return defaultIcon;
     }
   };
 
-  const handleOpenFile = async (url) => {
-    console.log('Opening file:', url);
+  // ── Open file: now accepts docType + description ──────────────────────────
+  const handleOpenFile = async (url, docType = "Document Preview", description = "") => {
     setIsVerifying(true);
     setVerificationError(null);
     setVerificationWarning(null);
 
     try {
-      // Step 1: URL safety check
       const urlCheck = isUrlSafe(url);
-      if (!urlCheck.safe) {
-        setVerificationError(urlCheck.reason);
-        setIsVerifying(false);
-        return;
-      }
+      if (!urlCheck.safe) { setVerificationError(urlCheck.reason); setIsVerifying(false); return; }
 
-      // Step 2: Extension check
       const extensionType = getFileTypeFromUrl(url);
-      if (extensionType === "blocked") {
-        setVerificationError('This file type is blocked for security reasons');
-        setIsVerifying(false);
-        return;
-      }
+      if (extensionType === "blocked") { setVerificationError('This file type is blocked for security reasons'); setIsVerifying(false); return; }
 
-      // Step 3: Content-Type verification (simplified for CORS)
       const contentCheck = await verifyContentType(url);
-      if (!contentCheck.safe) {
-        setVerificationError(contentCheck.reason);
-        setIsVerifying(false);
-        return;
-      }
+      if (!contentCheck.safe) { setVerificationError(contentCheck.reason); setIsVerifying(false); return; }
 
-      // All checks passed
       setSelectedFile(url);
+      setSelectedDocType(docType);
+      setSelectedDescription(description);
       setFileType(contentCheck.type || extensionType);
       setIsModalOpen(true);
-      
     } catch (error) {
-      console.error('Error opening file:', error);
       setVerificationError('An error occurred while opening the file');
     } finally {
       setIsVerifying(false);
@@ -381,6 +254,8 @@ const BranchCollapseContent = ({ branch, details, documents = [], documentsLoadi
   const handleCancel = () => {
     setIsModalOpen(false);
     setSelectedFile(null);
+    setSelectedDocType("");
+    setSelectedDescription("");
     setFileType("");
     setVerificationError(null);
     setVerificationWarning(null);
@@ -388,67 +263,40 @@ const BranchCollapseContent = ({ branch, details, documents = [], documentsLoadi
 
   const renderPreview = () => {
     if (!selectedFile) return <p>No file selected</p>;
-
     switch (fileType) {
       case "pdf":
-        return <SecurePDFPreview url={selectedFile} />;
-      
+        return <SecurePDFPreview url={selectedFile} description={selectedDescription} />;
       case "image":
-        return <SecureImagePreview url={selectedFile} />;
-      
+        return <SecureImagePreview url={selectedFile} description={selectedDescription} />;
       case "excel":
       case "word":
         return (
-          <div className="unsupported-file-container" style={{ textAlign: 'center', padding: 40 }}>
-            <Alert
-              message={`${fileType === "excel" ? "Excel" : "Word"} File`}
-              description="Preview not supported for this file type. Click below to download or open in a new tab."
-              type="info"
-              showIcon
-            />
-            <Button 
-              type="primary" 
-              size="large"
-              style={{ marginTop: 16 }}
-              onClick={() => window.open(selectedFile, '_blank', 'noopener,noreferrer')}
-            >
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Alert message={`${fileType === "excel" ? "Excel" : "Word"} File`} description="Preview not supported. Click below to open." type="info" showIcon />
+            <Button type="primary" size="large" style={{ marginTop: 16 }} onClick={() => window.open(selectedFile, '_blank', 'noopener,noreferrer')}>
               Open {fileType === "excel" ? "Excel" : "Word"} File
             </Button>
+            <DescriptionCaption text={selectedDescription} />
           </div>
         );
-
       case "video":
         return (
           <div style={{ textAlign: 'center' }}>
-            <video 
-              controls 
-              style={{ maxWidth: '100%', maxHeight: '500px' }}
-              controlsList="nodownload"
-              // crossOrigin="anonymous"
-            >
+            <video controls style={{ maxWidth: '100%', maxHeight: 500 }} controlsList="nodownload">
               <source src={selectedFile} />
               Your browser does not support video playback.
             </video>
+            <DescriptionCaption text={selectedDescription} />
           </div>
         );
-
       default:
         return (
           <div style={{ textAlign: 'center', padding: 40 }}>
-            <Alert
-              message="Preview not available"
-              description="This file type cannot be previewed in the browser."
-              type="warning"
-              showIcon
-            />
-            <Button 
-              type="primary" 
-              size="large"
-              style={{ marginTop: 16 }}
-              onClick={() => window.open(selectedFile, '_blank', 'noopener,noreferrer')}
-            >
+            <Alert message="Preview not available" description="This file type cannot be previewed in the browser." type="warning" showIcon />
+            <Button type="primary" size="large" style={{ marginTop: 16 }} onClick={() => window.open(selectedFile, '_blank', 'noopener,noreferrer')}>
               Download or Open in New Tab
             </Button>
+            <DescriptionCaption text={selectedDescription} />
           </div>
         );
     }
@@ -461,184 +309,71 @@ const BranchCollapseContent = ({ branch, details, documents = [], documentsLoadi
           bordered
           size="small"
           column={{ xs: 1, sm: 2, md: 3 }}
-          labelStyle={{
-            
-            fontWeight: 600,
-            backgroundColor: "#e5e4e4",
-            width: "140px",
-            minWidth: "100px",
-            padding: '5px'
-          }}
-          contentStyle={{
-            backgroundColor: "#ffffff",
-           
-            width: "200px",
-            minWidth: "130px",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-           padding: '5px'
-          }}
+          labelStyle={{ fontWeight: 600, backgroundColor: "#e5e4e4", width: "140px", minWidth: "100px", padding: '5px' }}
+          contentStyle={{ backgroundColor: "#ffffff", width: "200px", minWidth: "130px", overflow: "hidden", textOverflow: "ellipsis", padding: '5px' }}
         >
-          <Descriptions.Item label="Code" span={1}>
-            {details.branch_code}
-          </Descriptions.Item>
+          <Descriptions.Item label="Code" span={1}>{details.branch_code}</Descriptions.Item>
+          <Descriptions.Item label="Name" span={1}>{branch.branch_name}</Descriptions.Item>
+          <Descriptions.Item label="Address" span={3}>{branch.branch_address}</Descriptions.Item>
 
-          <Descriptions.Item label="Name" span={1}>
-            {branch.branch_name}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Address" span={3}>
-            {branch.branch_address}
-          </Descriptions.Item>
-
-          {/* {(agreementCerts.length > 0 || additionalCerts.length > 0) && (
-            <>
-              {agreementCerts.map((cert, index) => {
-                const iconUrl = getFileIcon(cert.signed_url);
-                return (
-                  <Descriptions.Item
-                    key={`agreement-${index}`}
-                    label="Agreement"
-                    span={1}
-                  >
-                    <div className="file-item-container">
-                      <img src={iconUrl} alt="File Icon" width={20} height={20} />
-                      <span
-                        onClick={() => handleOpenFile(cert.signed_url)}
-                        className="file-link"
-                        title={details.agreement_description}
-                        role="button"
-                        tabIndex={0}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleOpenFile(cert.signed_url);
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {truncateText(details.agreement_description)}
-                      </span>
-                    </div>
-                  </Descriptions.Item>
-                );
-              })}
-
-              {additionalCerts.map((file, index) => {
-                const iconUrl = getFileIcon(file.signed_url);
-                return (
-                  <Descriptions.Item
-                    key={`additional-${index}`}
-                    label={`Certificate ${index + 1}`}
-                    span={1}
-                  >
-                    <div className="file-item-container">
-                      <img src={iconUrl} alt="File Icon" width={20} height={20} />
-                      <span
-                        onClick={() => handleOpenFile(file.signed_url)}
-                        className="file-link"
-                        title={file.additional_certifi_description}
-                        role="button"
-                        tabIndex={0}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleOpenFile(file.signed_url);
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {truncateText(file.additional_certifi_description)}
-                      </span>
-                    </div>
-                  </Descriptions.Item>
-                );
-              })}
-            </>
-          )} */}
+          {/* Documents loading spinner */}
           {documentsLoading && (
-  <Descriptions.Item label="Documents" span={3}>
-    <Spin size="small" tip="Loading documents..." />
-  </Descriptions.Item>
-)}
+            <Descriptions.Item label="Documents" span={3}>
+              <Spin size="small" tip="Loading documents..." />
+            </Descriptions.Item>
+          )}
 
-{!documentsLoading && documents.length > 0 &&
-  documents.map((doc, index) => {
-    const iconUrl = getFileIcon(doc.signed_url);
-    return (
-      <Descriptions.Item
-        key={`branch-doc-${doc.id}`}
-        label={doc.document_type || `Document ${index + 1}`}
-        span={1}
-      >
-        <div className="file-item-container">
-          <img src={iconUrl} alt="File Icon" width={20} height={20} />
-          <span
-            onClick={() => handleOpenFile(doc.signed_url)}
-            className="file-link"
-            title={doc.document_description}
-            role="button"
-            tabIndex={0}
-            onKeyPress={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleOpenFile(doc.signed_url);
-              }
-            }}
-            style={{ cursor: "pointer" }}
-          >
-            {truncateText(doc.document_description)}
-          </span>
-        </div>
-      </Descriptions.Item>
-    );
-  })
-}
+          {/* Document rows — pass docType as title, description as caption */}
+          {!documentsLoading && documents.length > 0 &&
+            documents.map((doc, index) => {
+              const iconUrl = getFileIcon(doc.signed_url);
+              const docType = doc.document_type || `Document ${index + 1}`;
+              const desc    = doc.document_description || "";
+              return (
+                <Descriptions.Item key={`branch-doc-${doc.id}`} label={docType} span={1}>
+                  <div className="file-item-container">
+                    <img src={iconUrl} alt="File Icon" width={20} height={20} />
+                    <span
+  onClick={() => handleOpenFile(doc.signed_url, docType, desc)}
+  title={desc}
+  role="button"
+  tabIndex={0}
+  onKeyPress={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpenFile(doc.signed_url, docType, desc); } }}
+  style={{ cursor: "pointer" }}
+>
+ <Tag color="green" style={{ fontSize: "18px" }}>{truncateText(desc)}</Tag>
+</span>
+                  </div>
+                </Descriptions.Item>
+              );
+            })
+          }
         </Descriptions>
 
         {verificationError && (
-          <Alert
-            message="Security Warning"
-            description={verificationError}
-            type="error"
-            showIcon
-            closable
-            onClose={() => setVerificationError(null)}
-            style={{ marginTop: 16 }}
-          />
+          <Alert message="Security Warning" description={verificationError} type="error" showIcon closable onClose={() => setVerificationError(null)} style={{ marginTop: 16 }} />
         )}
       </div>
 
+      {/* Document Preview Modal — title = document type */}
       <Modal
-        title="Document Preview"
+        title={selectedDocType || "Document Preview"}
         open={isModalOpen}
         onCancel={handleCancel}
-        footer={[
-          <Button key="cancel" onClick={handleCancel}>
-            Close
-          </Button>,
-        ]}
+        footer={[<Button key="cancel" onClick={handleCancel}>Close</Button>]}
         width={800}
         centered
         destroyOnClose
       >
         {isVerifying ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <Spin tip="Verifying file security..." />
-          </div>
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin tip="Verifying file security..." /></div>
         ) : (
           <>
             {verificationWarning && (
-              <Alert
-                message={verificationWarning}
-                type="warning"
-                showIcon
-                closable
-                style={{ marginBottom: 16 }}
-              />
+              <Alert message={verificationWarning} type="warning" showIcon closable style={{ marginBottom: 16 }} />
             )}
             {renderPreview()}
-          </>     
+          </>
         )}
       </Modal>
     </>

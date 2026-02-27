@@ -31,12 +31,15 @@ const AddBranch = () => {
   const [pendingBranchId, setPendingBranchId] = useState(null);
   const [pendingBranchName, setPendingBranchName] = useState(null);
 
-  // Existing docs from API (shown as Document 1, Document 2, ...)
+  // Existing docs from API
   const [existingDocs, setExistingDocs] = useState([]);
-  // New empty upload fields appended after existing docs
-  const [newDocFields, setNewDocFields] = useState([{ id: Date.now(), file: null, loading: false }]);
 
-  // Track if documents have been modified (to show Previous/Update buttons)
+  // New upload fields
+  const [newDocFields, setNewDocFields] = useState([]);
+
+  // Controls whether the new-doc upload area is expanded (toggled by + button in edit mode)
+  const [showNewDocFields, setShowNewDocFields] = useState(false);
+
   const [docsModified, setDocsModified] = useState(false);
 
   const [cameraVisible, setCameraVisible] = useState(false);
@@ -97,13 +100,20 @@ const AddBranch = () => {
       if (response.status === 200) {
         const docs = response.data?.results || [];
         setExistingDocs(docs);
-        // Reset new doc fields to one empty field
-        setNewDocFields([{ id: Date.now(), file: null, loading: false }]);
         setDocsModified(false);
-        // Set form values for new doc fields
-        form.setFieldsValue({
-          new_branch_documents: [{ document_type: '', document_description: '' }],
-        });
+
+        if (docs.length === 0) {
+          // No existing docs: show upload fields normally (same as add mode)
+          const firstId = Date.now();
+          setNewDocFields([{ id: firstId, file: null, loading: false }]);
+          setShowNewDocFields(true);
+          form.setFieldsValue({ new_branch_documents: [{ document_type: '', document_description: '' }] });
+        } else {
+          // Has existing docs: collapse new-doc area, only + button shown
+          setNewDocFields([]);
+          setShowNewDocFields(false);
+          form.setFieldsValue({ new_branch_documents: [] });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch branch documents:', error);
@@ -141,11 +151,15 @@ const AddBranch = () => {
         window.history.replaceState(null, "", window.location.pathname);
       }
     } else {
-      setNewDocFields([{ id: Date.now(), file: null, loading: false }]);
+      // Add mode: show one empty field by default, no existing docs
+      const firstId = Date.now();
+      setNewDocFields([{ id: firstId, file: null, loading: false }]);
+      setShowNewDocFields(true);
       setExistingDocs([]);
       setIsBasicInfoSaved(false);
       setBranchId(null);
       setDocsModified(false);
+      form.setFieldsValue({ new_branch_documents: [{ document_type: '', document_description: '' }] });
     }
   }, [params?.id]);
 
@@ -179,7 +193,7 @@ const AddBranch = () => {
     cameraFieldRef.current = { fieldId: null };
   };
 
-  // ── File Select / Clear (new fields only) ────────────────────────────────
+  // ── File Select / Clear ───────────────────────────────────────────────────
   const handleFileSelect = (file, fieldId) => {
     const original = file.originFileObj || file;
     setNewDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, file: original } : f)));
@@ -195,17 +209,20 @@ const AddBranch = () => {
     setFormUpdateTrigger((t) => t + 1);
   };
 
-  // ── Upload single new document ────────────────────────────────────────────
+  // ── Upload single document (per-field button) ─────────────────────────────
   const uploadDocument = async (fieldId, index, currentBranchId) => {
     const fieldObj = newDocFields.find((f) => f.id === fieldId);
     const file = fieldObj?.file;
-    if (!file) return true;
 
     const docType = form.getFieldValue(['new_branch_documents', index, 'document_type']);
     const docDescription = form.getFieldValue(['new_branch_documents', index, 'document_description']);
 
+    if (!file) {
+      notification.error({ message: 'Error', description: 'Please select a file first.', duration: 3 });
+      return false;
+    }
     if (!docType || docType.trim() === '') {
-      form.setFields([{ name: ['new_branch_documents', index, 'document_type'], errors: ['Please enter document type'] }]);
+      form.setFields([{ name: ['new_branch_documents', index, 'document_type'], errors: ['Please enter document name'] }]);
       return false;
     }
     if (!docDescription || docDescription.trim() === '') {
@@ -229,8 +246,12 @@ const AddBranch = () => {
       setNewDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: false, file: null } : f)));
 
       if (response.status === 200 || response.status === 201) {
+        notification.success({ message: 'Upload Successful', description: `"${docType}" document uploaded successfully.`, duration: 4 });
         form.setFieldValue(['new_branch_documents', index, 'document_type'], '');
         form.setFieldValue(['new_branch_documents', index, 'document_description'], '');
+        setFormUpdateTrigger((t) => t + 1);
+        // Refresh — also resets newDocFields & collapses the upload area
+        await fetchBranchDocuments(currentBranchId);
         return true;
       } else {
         throw new Error(response.statusText || 'Upload failed');
@@ -273,7 +294,7 @@ const AddBranch = () => {
         if (params.id) {
           localStorage.setItem('selected_branch_id', params.id);
           localStorage.setItem('selected_branch_name', values.branch_name);
-          notification.success({ message: 'Branch Updated', description: 'Basic info updated successfully.', duration: 5 });
+          notification.success({ message: 'Branch Updated', description: `"${values.branch_name}" has been updated successfully.`, duration: 5 });
           setActiveTab("2");
           await fetchBranchDocuments(params.id);
         } else {
@@ -313,7 +334,7 @@ const AddBranch = () => {
     setSessionModalVisible(false);
     notification.success({
       message: 'Branch Created',
-      description: 'Session updated. Loading document upload...',
+      description: `"${pendingBranchName}" has been created successfully.`,
       duration: 2,
     });
     setTimeout(() => {
@@ -321,44 +342,18 @@ const AddBranch = () => {
     }, 1200);
   };
 
-  // ── Save Documents (Tab 2) ────────────────────────────────────────────────
+  // ── Done button — uploads happen per-field, just navigate away ────────────
   const handleSaveDocuments = async () => {
-    const currentBranchId = branchId || params.id;
-    if (!currentBranchId) {
-      notification.error({ message: 'Error', description: 'Please save branch info first.', duration: 5 });
-      return;
-    }
-
-    const fieldsWithFiles = newDocFields.filter((f) => f.file !== null);
-
-    // No new files to upload — navigate directly to list
-    if (fieldsWithFiles.length === 0) {
-      navigate('/branch/list');
-      return;
-    }
-
-    setLoader(true);
-    let allUploadsSuccessful = true;
-
-    for (const field of fieldsWithFiles) {
-      const index = newDocFields.findIndex((f) => f.id === field.id);
-      const success = await uploadDocument(field.id, index, currentBranchId);
-      if (!success) allUploadsSuccessful = false;
-    }
-
-    setLoader(false);
-
-    if (allUploadsSuccessful) {
-      notification.success({ message: 'Documents Uploaded', description: 'All documents uploaded successfully.', duration: 5 });
-      navigate('/branch/list');
-    }
+    navigate('/branch/list');
   };
 
   // ── Delete existing doc ───────────────────────────────────────────────────
   const handleDeleteDocument = (docId, fileName) => {
+    const doc = existingDocs.find((d) => d.id === docId);
+    const docType = doc?.document_type || fileName || 'Document';
     Modal.confirm({
       title: 'Confirm Delete',
-      content: `Are you sure you want to delete: ${fileName || 'Document'}?`,
+      content: `Are you sure you want to delete the "${docType}" document?`,
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {
@@ -369,9 +364,18 @@ const AddBranch = () => {
             notification.error({ message: 'Error', description: 'Failed to delete document.', duration: 5 });
             return;
           }
-          setExistingDocs((prev) => prev.filter((d) => d.id !== docId));
+          const updatedDocs = existingDocs.filter((d) => d.id !== docId);
+          setExistingDocs(updatedDocs);
           setDocsModified(true);
-          notification.success({ message: 'Deleted', description: `${fileName || 'Document'} deleted successfully.`, duration: 5 });
+          notification.success({ message: 'Deleted', description: `"${docType}" document deleted successfully.`, duration: 5 });
+
+          // If no docs remain, show upload fields normally
+          if (updatedDocs.length === 0) {
+            const firstId = Date.now();
+            setNewDocFields([{ id: firstId, file: null, loading: false }]);
+            setShowNewDocFields(true);
+            form.setFieldsValue({ new_branch_documents: [{ document_type: '', document_description: '' }] });
+          }
         } catch (error) {
           notification.error({ message: 'Error', description: error.message || 'Deletion failed.', duration: 5 });
         }
@@ -379,7 +383,15 @@ const AddBranch = () => {
     });
   };
 
-  // ── Add / Remove new doc fields ───────────────────────────────────────────
+  // ── Expand the new-doc upload area (+ button clicked in edit mode) ─────────
+  const handleShowNewDocFields = () => {
+    const firstId = Date.now();
+    setNewDocFields([{ id: firstId, file: null, loading: false }]);
+    setShowNewDocFields(true);
+    form.setFieldsValue({ new_branch_documents: [{ document_type: '', document_description: '' }] });
+  };
+
+  // ── Add another row inside the open upload area ───────────────────────────
   const addNewDocField = () => {
     const newId = Date.now();
     setNewDocFields((prev) => [...prev, { id: newId, file: null, loading: false }]);
@@ -388,8 +400,16 @@ const AddBranch = () => {
     setDocsModified(true);
   };
 
+  // ── Remove a row; if last row removed, collapse the section ──────────────
   const removeNewDocField = (fieldId, index) => {
-    setNewDocFields((prev) => prev.filter((f) => f.id !== fieldId));
+    const updated = newDocFields.filter((f) => f.id !== fieldId);
+    if (updated.length === 0) {
+      setNewDocFields([]);
+      setShowNewDocFields(false);
+      form.setFieldsValue({ new_branch_documents: [] });
+      return;
+    }
+    setNewDocFields(updated);
     const current = form.getFieldValue('new_branch_documents') || [];
     current.splice(index, 1);
     form.setFieldsValue({ new_branch_documents: [...current] });
@@ -446,14 +466,174 @@ const AddBranch = () => {
     window.open(documentUrl, '_blank');
   };
 
+  // ── Reusable: render upload fields (used in both branches of the condition) ─
+  const renderUploadFields = (offsetForDocNumber = 0) => {
+    const currentBranchId = branchId || params.id;
+
+    return newDocFields.map((field, index) => {
+      const globalDocNumber = offsetForDocNumber + index + 1;
+      const docType = form.getFieldValue(['new_branch_documents', index, 'document_type']);
+      const docDesc = form.getFieldValue(['new_branch_documents', index, 'document_description']);
+      const isUploadDisabled =
+        !field.file ||
+        !docType || docType.trim() === '' ||
+        !docDesc || docDesc.trim() === '';
+
+      return (
+        <div key={field.id} className="mb-3">
+          {newDocFields.length > 1 && (
+            <Divider orientation="center" style={{ borderTopWidth: '2px', borderColor: '#d9d9d9' }}>
+              {`Document ${globalDocNumber}`}
+            </Divider>
+          )}
+
+          <div className="row">
+            {/* File Upload */}
+            <div className="col-md-4">
+              <Form.Item label="File Upload" style={{ marginBottom: '8px' }}>
+                <Space.Compact style={{ width: '100%', marginBottom: field.file ? '8px' : '0' }}>
+                  <Upload
+                    maxCount={1}
+                    multiple={false}
+                    beforeUpload={(file) => handleFileSelect(file, field.id)}
+                    accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx"
+                    showUploadList={false}
+                    fileList={[]}
+                  >
+                    <Button icon={<UploadOutlined />} style={{ width: '100%', textAlign: 'left', paddingLeft: '12px' }}>
+                      Browse
+                    </Button>
+                  </Upload>
+                  <Button icon={<CameraOutlined />} onClick={() => openCamera(field.id)} title="Capture with Camera">
+                    Camera
+                  </Button>
+                </Space.Compact>
+
+                {field.file && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '4px 11px', border: '1px solid #d9d9d9',
+                    borderRadius: '6px', backgroundColor: '#f6ffed',
+                  }}>
+                    <div style={{
+                      fontSize: '13px', color: '#52c41a', fontWeight: '500',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      maxWidth: 'calc(100% - 30px)',
+                    }} title={field.file.name}>
+                      <FileOutlined style={{ marginRight: '5px' }} />
+                      {field.file.name.length > 25 ? field.file.name.substring(0, 25) + '...' : field.file.name}
+                    </div>
+                    <Button
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => handleClearFile(field.id)}
+                      danger type="text" size="small"
+                      style={{ padding: '0', height: 'auto', marginLeft: '8px' }}
+                    />
+                  </div>
+                )}
+              </Form.Item>
+            </div>
+
+            {/* Document Type */}
+            <div className="col-md-4">
+              <Form.Item
+                label="Document Name"
+                name={['new_branch_documents', index, 'document_type']}
+                style={{ marginBottom: '8px' }}
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (field.file && (!value || value.trim() === '')) {
+                        return Promise.reject('Please enter document name');
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                  { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: 'Must start with an alphabet' },
+                ]}
+              >
+                <InputWithAddon
+                  icon={<FileTextOutlined />}
+                  placeholder="Enter document Name"
+                  onValueFilter={descriptionValueFilter}
+                  onChange={() => { setFormUpdateTrigger((t) => t + 1); setDocsModified(true); }}
+                />
+              </Form.Item>
+            </div>
+
+            {/* Document Description */}
+            <div className="col-md-4">
+              <Form.Item
+                label="Description"
+                name={['new_branch_documents', index, 'document_description']}
+                style={{ marginBottom: '8px' }}
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (field.file && (!value || value.trim() === '')) {
+                        return Promise.reject('Enter description to upload the document');
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                  { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: 'Must start with an alphabet' },
+                ]}
+              >
+                <InputWithAddon
+                  icon={<FileTextOutlined />}
+                  placeholder="Enter description"
+                  onValueFilter={descriptionValueFilter}
+                  onChange={() => { setFormUpdateTrigger((t) => t + 1); setDocsModified(true); }}
+                />
+              </Form.Item>
+            </div>
+          </div>
+
+          {/* Upload + Plus / Minus buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+            <Button
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              loading={field.loading}
+              disabled={isUploadDisabled}
+              onClick={() => uploadDocument(field.id, index, currentBranchId)}
+            >
+              Upload
+            </Button>
+
+            {index === newDocFields.length - 1 && (
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<PlusOutlined />}
+                onClick={addNewDocField}
+                style={{ width: 35, height: 35, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
+              />
+            )}
+
+            <Button
+              type="primary"
+              danger
+              shape="circle"
+              icon={<MinusOutlined />}
+              onClick={() => removeNewDocField(field.id, index)}
+              style={{ width: 35, height: 35, backgroundColor: 'red', borderColor: 'red' }}
+            />
+          </div>
+        </div>
+      );
+    });
+  };
+
   // ── Documents Tab Content ─────────────────────────────────────────────────
   const renderDocumentsTab = () => {
     const totalExisting = existingDocs.length;
+    const hasExistingDocs = totalExisting > 0;
 
     return (
       <div className="add-branch-form-container">
 
-        {/* ── Existing Documents rendered as Document 1, 2, ... ── */}
+        {/* ── Existing Documents ── */}
         {existingDocs.map((doc, idx) => {
           const displayName = doc.document_file?.original_name || 'Document';
           const truncatedName = displayName.length > 20 ? displayName.slice(0, 20) + '...' : displayName;
@@ -475,9 +655,10 @@ const AddBranch = () => {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                         <FileOutlined style={{ color: '#1890ff', fontSize: '16px', flexShrink: 0 }} />
-                        <span style={{ fontSize: '13px', color: '#1890ff', fontWeight: 500,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          title={displayName}>
+                        <span style={{
+                          fontSize: '13px', color: '#1890ff', fontWeight: 500,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }} title={displayName}>
                           {truncatedName}
                         </span>
                       </div>
@@ -491,23 +672,21 @@ const AddBranch = () => {
                   </Form.Item>
                 </div>
 
-                {/* Document Type (read-only display) */}
+                {/* Document Type (read-only) */}
                 <div className="col-md-4">
-                  <Form.Item label="Document Type" style={{ marginBottom: '8px' }}>
+                  <Form.Item label="Document Name" style={{ marginBottom: '8px' }}>
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       padding: '6px 11px', border: '1px solid #d9d9d9',
                       borderRadius: '6px', backgroundColor: '#fafafa', minHeight: '36px',
                     }}>
                       <FileTextOutlined style={{ color: '#8c8c8c' }} />
-                      <span style={{ fontSize: '13px', color: '#333' }}>
-                        {doc.document_type || '—'}
-                      </span>
+                      <span style={{ fontSize: '13px', color: '#333' }}>{doc.document_type || '—'}</span>
                     </div>
                   </Form.Item>
                 </div>
 
-                {/* Description (read-only display) */}
+                {/* Description (read-only) */}
                 <div className="col-md-4">
                   <Form.Item label="Description" style={{ marginBottom: '8px' }}>
                     <div style={{
@@ -516,9 +695,7 @@ const AddBranch = () => {
                       borderRadius: '6px', backgroundColor: '#fafafa', minHeight: '36px',
                     }}>
                       <FileTextOutlined style={{ color: '#8c8c8c' }} />
-                      <span style={{ fontSize: '13px', color: '#333' }}>
-                        {doc.document_description || '—'}
-                      </span>
+                      <span style={{ fontSize: '13px', color: '#333' }}>{doc.document_description || '—'}</span>
                     </div>
                   </Form.Item>
                 </div>
@@ -527,147 +704,42 @@ const AddBranch = () => {
           );
         })}
 
-        {/* ── New Document Upload Fields ── */}
-        <Divider orientation="center" style={{ borderColor: '#d9d9d9' }}>Add New Documents</Divider>
-
-        {newDocFields.map((field, index) => {
-          const globalDocNumber = totalExisting + index + 1;
-
-          return (
-            <div key={field.id} className="mb-3">
-              {newDocFields.length > 1 && (
-                <Divider orientation="center" style={{ borderTopWidth: '2px', borderColor: '#d9d9d9' }}>
-                  {`Document ${globalDocNumber}`}
-                </Divider>
-              )}
-
-              <div className="row">
-                {/* File Upload */}
-                <div className="col-md-4">
-                  <Form.Item label="File Upload" style={{ marginBottom: '8px' }}>
-                    <Space.Compact style={{ width: '100%', marginBottom: field.file ? '8px' : '0' }}>
-                      <Upload
-                        maxCount={1}
-                        multiple={false}
-                        beforeUpload={(file) => handleFileSelect(file, field.id)}
-                        accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx"
-                        showUploadList={false}
-                        fileList={[]}
-                      >
-                        <Button icon={<UploadOutlined />} style={{ width: '100%', textAlign: 'left', paddingLeft: '12px' }}>
-                          Browse
-                        </Button>
-                      </Upload>
-                      <Button icon={<CameraOutlined />} onClick={() => openCamera(field.id)} title="Capture with Camera">
-                        Camera
-                      </Button>
-                    </Space.Compact>
-
-                    {field.file && (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '4px 11px', border: '1px solid #d9d9d9',
-                        borderRadius: '6px', backgroundColor: '#f6ffed',
-                      }}>
-                        <div style={{
-                          fontSize: '13px', color: '#52c41a', fontWeight: '500',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          maxWidth: 'calc(100% - 30px)',
-                        }} title={field.file.name}>
-                          <FileOutlined style={{ marginRight: '5px' }} />
-                          {field.file.name.length > 25 ? field.file.name.substring(0, 25) + '...' : field.file.name}
-                        </div>
-                        <Button
-                          icon={<CloseCircleOutlined />}
-                          onClick={() => handleClearFile(field.id)}
-                          danger type="text" size="small"
-                          style={{ padding: '0', height: 'auto', marginLeft: '8px' }}
-                        />
-                      </div>
-                    )}
-                  </Form.Item>
-                </div>
-
-                {/* Document Type */}
-                <div className="col-md-4">
-                  <Form.Item
-                    label="Document Type"
-                    name={['new_branch_documents', index, 'document_type']}
-                    style={{ marginBottom: '8px' }}
-                    rules={[
-                      {
-                        validator: (_, value) => {
-                          if (field.file && (!value || value.trim() === '')) {
-                            return Promise.reject('Please enter document type');
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                      { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: 'Must start with an alphabet' },
-                    ]}
-                  >
-                    <InputWithAddon
-                      icon={<FileTextOutlined />}
-                      placeholder="Enter document type"
-                      onValueFilter={descriptionValueFilter}
-                      onChange={() => { setFormUpdateTrigger((t) => t + 1); setDocsModified(true); }}
-                    />
-                  </Form.Item>
-                </div>
-
-                {/* Document Description */}
-                <div className="col-md-4">
-                  <Form.Item
-                    label="Description"
-                    name={['new_branch_documents', index, 'document_description']}
-                    style={{ marginBottom: '8px' }}
-                    rules={[
-                      {
-                        validator: (_, value) => {
-                          if (field.file && (!value || value.trim() === '')) {
-                            return Promise.reject('Enter description to upload the document');
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                      { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: 'Must start with an alphabet' },
-                    ]}
-                  >
-                    <InputWithAddon
-                      icon={<FileTextOutlined />}
-                      placeholder="Enter description"
-                      onValueFilter={descriptionValueFilter}
-                      onChange={() => { setFormUpdateTrigger((t) => t + 1); setDocsModified(true); }}
-                    />
-                  </Form.Item>
-                </div>
-              </div>
-
-              {/* Plus / Minus buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-                {index === newDocFields.length - 1 && (
-                  <Button
-                    type="primary"
-                    shape="circle"
-                    icon={<PlusOutlined />}
-                    onClick={addNewDocField}
-                    style={{ width: 35, height: 35, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
-                  />
-                )}
-                {newDocFields.length > 1 && (
-                  <Button
-                    type="primary"
-                    danger
-                    shape="circle"
-                    icon={<MinusOutlined />}
-                    onClick={() => removeNewDocField(field.id, index)}
-                    style={{ width: 35, height: 35, backgroundColor: 'red', borderColor: 'red' }}
-                  />
-                )}
-              </div>
+        {/* ── New Document Section ── */}
+        {hasExistingDocs ? (
+          /*
+           * EDIT MODE — documents already exist:
+           *   • Collapsed  → show only a centred green + button
+           *   • Expanded   → show the upload fields with a divider header
+           */
+          !showNewDocFields ? (
+            // ── Collapsed: just the + button ──
+            <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '24px 0 16px' }}>
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<PlusOutlined />}
+                onClick={handleShowNewDocFields}
+                title="Add new document"
+                style={{ width: 40, height: 40, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
+              />
             </div>
-          );
-        })}
+          ) : (
+            // ── Expanded: divider + upload fields ──
+            <>
+              <Divider orientation="center" style={{ borderColor: '#d9d9d9' }}>Add New Documents</Divider>
+              {renderUploadFields(totalExisting)}
+            </>
+          )
+        ) : (
+          /*
+           * ADD MODE (or edit mode with zero existing docs):
+           *   Show fields normally with a divider, no toggle needed.
+           */
+          <>
+            <Divider orientation="center" style={{ borderColor: '#d9d9d9' }}>Add New Documents</Divider>
+            {renderUploadFields(0)}
+          </>
+        )}
 
         {/* ── Action Buttons ── */}
         <div className="text-center mt-4" style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -675,7 +747,7 @@ const AddBranch = () => {
             Previous
           </Button>
           <Button type="primary" size="large" onClick={handleSaveDocuments} loading={loader}>
-            Update
+            Done
           </Button>
         </div>
       </div>
@@ -764,43 +836,39 @@ const AddBranch = () => {
       {loader && <Loader />}
 
       <div className="add-branch-page-content">
-
-        {/* ── Title bar — flex-shrink:0, never scrolls ── */}
-      {/* ── Scrollable body — only this scrolls ── */}
-<div className="add-branch-scroll-body" ref={scrollRef}>
-  <Form form={form} layout="vertical" style={{ padding: 0 }}>
-    <Tabs
-      activeKey={activeTab}
-      onChange={handleTabChange}
-      items={tabItems}
-      size="large"
-      type="card"
-      className="custom-tabs"
-      style={{ marginTop: 0, background: '#fff' }}
-      renderTabBar={(props, DefaultTabBar) => (
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 1000,
-            backgroundColor: "#fff",
-            boxShadow: isScrolled ? "0 2px 8px rgba(0,0,0,0.10)" : "none",
-            transition: "box-shadow 0.3s ease",
-          }}
-        >
-          <div style={{ paddingBottom: "8px" }}>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
-              {params.id ? "Edit Branch" : "Add Branch"}
-            </h2>
-          </div>
-          <DefaultTabBar {...props} />
-        </div>
-      )}
-    />
-  </Form>
+        <div className="add-branch-scroll-body" ref={scrollRef}>
+          <Form form={form} layout="vertical" style={{ padding: 0 }}>
+            <Tabs
+              activeKey={activeTab}
+              onChange={handleTabChange}
+              items={tabItems}
+              size="large"
+              type="card"
+              className="custom-tabs"
+              style={{ marginTop: 0, background: '#fff' }}
+              renderTabBar={(props, DefaultTabBar) => (
+                <div
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 1000,
+                    backgroundColor: "#fff",
+                    boxShadow: isScrolled ? "0 2px 8px rgba(0,0,0,0.10)" : "none",
+                    transition: "box-shadow 0.3s ease",
+                  }}
+                >
+                  <div style={{ paddingBottom: "8px" }}>
+                    <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
+                      {params.id ? "Edit Branch" : "Add Branch"}
+                    </h2>
+                  </div>
+                  <DefaultTabBar {...props} />
+                </div>
+              )}
+            />
+          </Form>
           <ToastContainer />
         </div>
-
       </div>
 
       {/* Camera */}
@@ -816,13 +884,20 @@ const AddBranch = () => {
       {/* ── Session Switch Modal ── */}
       <Modal
         open={sessionModalVisible}
-        title={<div style={{ textAlign: 'center', fontWeight: 600, fontSize: '16px' }}>Switch Branch</div>}
+        title={
+          <div>
+            <div style={{ textAlign: 'center', fontWeight: 600, fontSize: '16px', paddingBottom: '12px' }}>
+              Switch Branch
+            </div>
+            <Divider style={{ margin: 0, borderColor: '#d9d9d9' }} />
+          </div>
+        }
         centered
         closable={false}
         maskClosable={false}
         width={440}
-        footer={[
-          <div key="footer" style={{ display: 'flex', justifyContent: 'center', paddingBottom: '8px' }}>
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '8px' }}>
             <Button
               type="primary"
               size="large"
@@ -830,13 +905,14 @@ const AddBranch = () => {
               loading={sessionUpdating}
               style={{ minWidth: '120px' }}
             >
-              OK
+              Yes
             </Button>
           </div>
-        ]}
+        }
       >
-        <p style={{ color: '#595959', fontSize: '15px', lineHeight: '1.6', textAlign: 'center', margin: '16px 0' }}>
-          Change the session branch to <strong>"{pendingBranchName}"</strong> — the newly created branch — to add the documents.
+        <p style={{ color: '#595959', fontSize: '15px', lineHeight: '1.6', textAlign: 'center', margin: '20px 0 12px' }}>
+          Current session branch will be auto-changed to this newly created branch{' '}
+          <strong>"{pendingBranchName}"</strong>.
         </p>
       </Modal>
 

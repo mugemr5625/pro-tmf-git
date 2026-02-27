@@ -561,11 +561,11 @@ localStorage.removeItem("selected_area_name");
 
     setLoadingDocuments((prev) => ({ ...prev, [customerId]: true }));
     try {
-      const response = await GET(`/api/customer-documents/customer/${customerId}/documents/`);
+      const response = await GET(`/api/customer-documents/?customer_id=${customerId}`);
       let documents = [];
-      if (response && Array.isArray(response.data)) documents = response.data;
-      else if (response && Array.isArray(response)) documents = response;
-
+if (response?.data?.results && Array.isArray(response.data.results)) documents = response.data.results;
+else if (response && Array.isArray(response.data)) documents = response.data;
+else if (response && Array.isArray(response)) documents = response;
       setCustomerDocuments((prev) => ({ ...prev, [customerId]: documents }));
       return documents;
     } catch (error) {

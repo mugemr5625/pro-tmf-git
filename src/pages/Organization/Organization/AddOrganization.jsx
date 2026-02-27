@@ -4,7 +4,7 @@ import {
   Divider, Space, Modal, Spin, Tabs, DatePicker
 } from "antd";
 import {
-  UploadOutlined, PlusOutlined, MinusOutlined,
+  UploadOutlined, CloudUploadOutlined, PlusOutlined, MinusOutlined,
   BankOutlined, FileTextOutlined, CameraOutlined, EyeOutlined,
   DeleteOutlined, FileOutlined, CloseCircleOutlined, UserOutlined,
   PhoneOutlined, HomeOutlined, EnvironmentOutlined, MailOutlined,
@@ -25,6 +25,9 @@ const ORGANIZATION_API = "/api/organization/";
 const ORGANIZATION_DOCUMENTS_API = "/api/organization-documents/";
 const mapContainerStyle = { width: "100%", height: "400px" };
 
+// Consistent Form.Item bottom margin for all fields
+const fi = { marginBottom: "16px" };
+
 const AddOrganization = () => {
   const [loader, setLoader] = useState(false);
   const [form] = Form.useForm();
@@ -35,7 +38,8 @@ const AddOrganization = () => {
   const [orgId, setOrgId] = useState(null);
   const [isBasicInfoSaved, setIsBasicInfoSaved] = useState(false);
   const [existingDocs, setExistingDocs] = useState([]);
-  const [newDocFields, setNewDocFields] = useState([{ id: Date.now(), file: null, loading: false }]);
+  const [newDocFields, setNewDocFields] = useState([]);
+  const [showNewDocFields, setShowNewDocFields] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
   const cameraFieldRef = useRef({ fieldId: null });
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -65,7 +69,6 @@ const AddOrganization = () => {
     return () => clearInterval(interval);
   }, [isGettingLocation]);
 
-  // Window scroll tracking — same as AddBranch
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener("scroll", handleScroll);
@@ -79,14 +82,23 @@ const AddOrganization = () => {
     return null;
   };
 
+  // ── Fetch org documents ───────────────────────────────────────────────────
   const fetchOrgDocuments = async (id) => {
     try {
       const response = await GET(`${ORGANIZATION_DOCUMENTS_API}?organization_id=${id}`);
       if (response?.status === 200) {
         const docs = response.data?.results || response.data || [];
         setExistingDocs(docs);
-        setNewDocFields([{ id: Date.now(), file: null, loading: false }]);
-        form.setFieldsValue({ new_org_documents: [{ document_type: "", document_description: "" }] });
+        if (docs.length === 0) {
+          const firstId = Date.now();
+          setNewDocFields([{ id: firstId, file: null, loading: false }]);
+          setShowNewDocFields(true);
+          form.setFieldsValue({ new_org_documents: [{ document_type: "", document_description: "" }] });
+        } else {
+          setNewDocFields([]);
+          setShowNewDocFields(false);
+          form.setFieldsValue({ new_org_documents: [] });
+        }
       }
     } catch (error) {
       console.error("Failed to fetch organization documents:", error);
@@ -124,12 +136,22 @@ const AddOrganization = () => {
         if (data.logo_url) setLogoPreview(data.logo_url);
 
         form.setFieldsValue({
-          firm_name: data.firm_name, firm_address: data.firm_address,
-          proprietor_name: data.proprietor_name, proprietor_mobilenumber: data.proprietor_mobilenumber,
-          door_number: data.door_number, landmark: data.landmark, place: data.place,
-          street_name: data.street_name, district: data.district, pincode: data.pincode,
-          state: data.state, geo_location: data.geo_location, landline_number: data.landline_number,
-          fax_number: data.fax_number, firm_email: data.firm_email, website: data.website,
+          firm_name: data.firm_name,
+          firm_address: data.firm_address,
+          proprietor_name: data.proprietor_name,
+          proprietor_mobilenumber: data.proprietor_mobilenumber,
+          door_number: data.door_number,
+          street_name: data.street_name,
+          place: data.place,
+          landmark: data.landmark,
+          district: data.district,
+          pincode: data.pincode,
+          state: data.state,
+          geo_location: data.geo_location,
+          landline_number: data.landline_number,
+          fax_number: data.fax_number,
+          firm_email: data.firm_email,
+          website: data.website,
           firm_established_date: data.firm_established_date ? dayjs(data.firm_established_date) : null,
           doj: data.doj ? dayjs(data.doj) : null,
         });
@@ -152,13 +174,16 @@ const AddOrganization = () => {
         window.history.replaceState(null, "", window.location.pathname);
       }
     } else {
-      setNewDocFields([{ id: Date.now(), file: null, loading: false }]);
+      const firstId = Date.now();
+      setNewDocFields([{ id: firstId, file: null, loading: false }]);
+      setShowNewDocFields(true);
       setExistingDocs([]);
       setIsBasicInfoSaved(false);
       setOrgId(null);
       setPartners([{ id: 0, name: "", mobile: "" }]);
       setLogoFile(null);
       setLogoPreview(null);
+      form.setFieldsValue({ new_org_documents: [{ document_type: "", document_description: "" }] });
     }
   }, [params?.id]);
 
@@ -272,35 +297,33 @@ const AddOrganization = () => {
     setFormUpdateTrigger((t) => t + 1);
   };
 
+  // ── Upload single document (per-field button) ─────────────────────────────
   const uploadDocument = async (fieldId, index, currentOrgId) => {
     const fieldObj = newDocFields.find((f) => f.id === fieldId);
     const file = fieldObj?.file;
-    if (!file) return true;
     const docType = form.getFieldValue(["new_org_documents", index, "document_type"]);
     const docDescription = form.getFieldValue(["new_org_documents", index, "document_description"]);
-    if (!docType || docType.trim() === "") {
-      form.setFields([{ name: ["new_org_documents", index, "document_type"], errors: ["Please enter document type"] }]);
-      return false;
-    }
-    if (!docDescription || docDescription.trim() === "") {
-      form.setFields([{ name: ["new_org_documents", index, "document_description"], errors: ["Please enter description"] }]);
-      return false;
-    }
-    if (!(file instanceof File)) {
-      notification.error({ message: "Error", description: "Invalid file object. Please select the file again.", duration: 5 });
-      return false;
-    }
+
+    if (!file) { notification.error({ message: "Error", description: "Please select a file first.", duration: 3 }); return false; }
+    if (!docType || docType.trim() === "") { form.setFields([{ name: ["new_org_documents", index, "document_type"], errors: ["Please enter document type"] }]); return false; }
+    if (!docDescription || docDescription.trim() === "") { form.setFields([{ name: ["new_org_documents", index, "document_description"], errors: ["Please enter description"] }]); return false; }
+    if (!(file instanceof File)) { notification.error({ message: "Error", description: "Invalid file object. Please select the file again.", duration: 5 }); return false; }
+
     setNewDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: true } : f)));
     const formData = new FormData();
     formData.append("document_file", file, file.name);
     formData.append("document_type", docType);
     formData.append("document_description", docDescription);
+
     try {
       const response = await UPLOAD_CERTIFCATE(`${ORGANIZATION_DOCUMENTS_API}?organization_id=${currentOrgId}`, formData);
       setNewDocFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, loading: false, file: null } : f)));
       if (response.status === 200 || response.status === 201) {
+        notification.success({ message: "Upload Successful", description: `"${docType}" document uploaded successfully.`, duration: 4 });
         form.setFieldValue(["new_org_documents", index, "document_type"], "");
         form.setFieldValue(["new_org_documents", index, "document_description"], "");
+        setFormUpdateTrigger((t) => t + 1);
+        await fetchOrgDocuments(currentOrgId);
         return true;
       } else { throw new Error(response.statusText || "Upload failed"); }
     } catch (error) {
@@ -312,7 +335,7 @@ const AddOrganization = () => {
 
   const handleSaveBasicInfo = async () => {
     try {
-      await form.validateFields(["firm_name", "firm_address", "proprietor_name", "proprietor_mobilenumber", "door_number", "place", "street_name", "district", "pincode", "state"]);
+      await form.validateFields(["firm_name", "firm_address", "proprietor_name", "proprietor_mobilenumber", "door_number", "street_name", "place", "district", "pincode", "state"]);
     } catch {
       notification.error({ message: "Validation Error", description: "Please fill in all required fields.", duration: 5 });
       return;
@@ -329,9 +352,9 @@ const AddOrganization = () => {
       payload.append("proprietor_name", values.proprietor_name || "");
       payload.append("proprietor_mobilenumber", values.proprietor_mobilenumber || "");
       payload.append("door_number", values.door_number || "");
-      payload.append("landmark", values.landmark || "");
-      payload.append("place", values.place || "");
       payload.append("street_name", values.street_name || "");
+      payload.append("place", values.place || "");
+      payload.append("landmark", values.landmark || "");
       payload.append("district", values.district || "");
       payload.append("pincode", values.pincode || "");
       payload.append("state", values.state || "");
@@ -351,13 +374,14 @@ const AddOrganization = () => {
 
       if (response?.status === 200 || response?.status === 201) {
         if (params.id) {
-          notification.success({ message: "Organization Updated", description: "Basic info updated successfully.", duration: 5 });
+          notification.success({ message: "Organization Updated", description: `"${values.firm_name}" has been updated successfully.`, duration: 5 });
           setActiveTab("2");
           await fetchOrgDocuments(params.id);
         } else {
           const newOrgId = response.data?.id;
+          const newFirmName = response.data?.firm_name || values.firm_name;
           setOrgId(newOrgId); setIsBasicInfoSaved(true);
-          notification.success({ message: "Organization Created", description: "Organization created successfully.", duration: 5 });
+          notification.success({ message: "Organization Created", description: `"${newFirmName}" has been created successfully.`, duration: 5 });
           setTimeout(() => { window.location.href = `/organization/edit/${newOrgId}?tab=documents`; }, 1000);
         }
       } else if (response?.status === 400) {
@@ -370,38 +394,40 @@ const AddOrganization = () => {
     } finally { setLoader(false); }
   };
 
-  const handleSaveDocuments = async () => {
-    const currentOrgId = orgId || params.id;
-    if (!currentOrgId) { notification.error({ message: "Error", description: "Please save organization info first.", duration: 5 }); return; }
-    const fieldsWithFiles = newDocFields.filter((f) => f.file !== null);
-    if (fieldsWithFiles.length === 0) { navigate("/organization/list"); return; }
-    setLoader(true);
-    let allUploadsSuccessful = true;
-    for (const field of fieldsWithFiles) {
-      const index = newDocFields.findIndex((f) => f.id === field.id);
-      const success = await uploadDocument(field.id, index, currentOrgId);
-      if (!success) allUploadsSuccessful = false;
-    }
-    setLoader(false);
-    if (allUploadsSuccessful) {
-      notification.success({ message: "Documents Uploaded", description: "All documents uploaded successfully.", duration: 5 });
-      await fetchOrgDocuments(currentOrgId);
-    }
-  };
+  const handleSaveDocuments = async () => { navigate("/organization/list"); };
 
+  // ── Delete existing doc ───────────────────────────────────────────────────
   const handleDeleteDocument = (docId, fileName) => {
+    const doc = existingDocs.find((d) => d.id === docId);
+    const docType = doc?.document_type || fileName || "Document";
     Modal.confirm({
-      title: "Confirm Delete", content: `Are you sure you want to delete: ${fileName || "Document"}?`, okText: "Delete", okType: "danger",
+      title: "Confirm Delete",
+      content: `Are you sure you want to delete the "${docType}" document?`,
+      okText: "Delete", okType: "danger",
       onOk: async () => {
         try {
           const currentOrgId = orgId || params.id;
           const deleteResponse = await DELETE(`${ORGANIZATION_DOCUMENTS_API}${docId}/?organization_id=${currentOrgId}`);
           if (deleteResponse.status !== 200 && deleteResponse.status !== 204) { notification.error({ message: "Error", description: "Failed to delete document.", duration: 5 }); return; }
-          setExistingDocs((prev) => prev.filter((d) => d.id !== docId));
-          notification.success({ message: "Deleted", description: `${fileName || "Document"} deleted successfully.`, duration: 5 });
+          const updatedDocs = existingDocs.filter((d) => d.id !== docId);
+          setExistingDocs(updatedDocs);
+          notification.success({ message: "Deleted", description: `"${docType}" document deleted successfully.`, duration: 5 });
+          if (updatedDocs.length === 0) {
+            const firstId = Date.now();
+            setNewDocFields([{ id: firstId, file: null, loading: false }]);
+            setShowNewDocFields(true);
+            form.setFieldsValue({ new_org_documents: [{ document_type: "", document_description: "" }] });
+          }
         } catch (error) { notification.error({ message: "Error", description: error.message || "Deletion failed.", duration: 5 }); }
       },
     });
+  };
+
+  const handleShowNewDocFields = () => {
+    const firstId = Date.now();
+    setNewDocFields([{ id: firstId, file: null, loading: false }]);
+    setShowNewDocFields(true);
+    form.setFieldsValue({ new_org_documents: [{ document_type: "", document_description: "" }] });
   };
 
   const addNewDocField = () => {
@@ -412,7 +438,9 @@ const AddOrganization = () => {
   };
 
   const removeNewDocField = (fieldId, index) => {
-    setNewDocFields((prev) => prev.filter((f) => f.id !== fieldId));
+    const updated = newDocFields.filter((f) => f.id !== fieldId);
+    if (updated.length === 0) { setNewDocFields([]); setShowNewDocFields(false); form.setFieldsValue({ new_org_documents: [] }); return; }
+    setNewDocFields(updated);
     const current = form.getFieldValue("new_org_documents") || [];
     current.splice(index, 1);
     form.setFieldsValue({ new_org_documents: [...current] });
@@ -447,10 +475,94 @@ const AddOrganization = () => {
     window.open(documentUrl, "_blank");
   };
 
+  // ── Reusable: render upload fields ───────────────────────────────────────
+  const renderUploadFields = (offsetForDocNumber = 0) => {
+    const currentOrgId = orgId || params.id;
+    return newDocFields.map((field, index) => {
+      const globalDocNumber = offsetForDocNumber + index + 1;
+      const docType = form.getFieldValue(["new_org_documents", index, "document_type"]);
+      const docDesc = form.getFieldValue(["new_org_documents", index, "document_description"]);
+      const isUploadDisabled = !field.file || !docType || docType.trim() === "" || !docDesc || docDesc.trim() === "";
+
+      return (
+        <div key={field.id} className="mb-3">
+          {newDocFields.length > 1 && (
+            <Divider orientation="center" style={{ borderTopWidth: "2px", borderColor: "#d9d9d9" }}>{`Document ${globalDocNumber}`}</Divider>
+          )}
+          <div className="row">
+            {/* File Upload */}
+            <div className="col-md-4">
+              <Form.Item label="File Upload" style={{ marginBottom: "8px" }}>
+                <Space.Compact style={{ width: "100%", marginBottom: field.file ? "8px" : "0" }}>
+                  <Upload maxCount={1} multiple={false} beforeUpload={(file) => handleFileSelect(file, field.id)} accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx" showUploadList={false} fileList={[]}>
+                    <Button icon={<UploadOutlined />} style={{ width: "100%", textAlign: "left", paddingLeft: "12px" }}>Browse</Button>
+                  </Upload>
+                  <Button icon={<CameraOutlined />} onClick={() => openCamera(field.id)} title="Capture with Camera">Camera</Button>
+                </Space.Compact>
+                {field.file && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 11px", border: "1px solid #d9d9d9", borderRadius: "6px", backgroundColor: "#f6ffed" }}>
+                    <div style={{ fontSize: "13px", color: "#52c41a", fontWeight: "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "calc(100% - 30px)" }} title={field.file.name}>
+                      <FileOutlined style={{ marginRight: "5px" }} />
+                      {field.file.name.length > 25 ? field.file.name.substring(0, 25) + "..." : field.file.name}
+                    </div>
+                    <Button icon={<CloseCircleOutlined />} onClick={() => handleClearFile(field.id)} danger type="text" size="small" style={{ padding: "0", height: "auto", marginLeft: "8px" }} />
+                  </div>
+                )}
+              </Form.Item>
+            </div>
+
+            {/* Document Type */}
+            <div className="col-md-4">
+              <Form.Item label="Document Type" name={["new_org_documents", index, "document_type"]} style={{ marginBottom: "8px" }}
+                rules={[
+                  { validator: (_, value) => { if (field.file && (!value || value.trim() === "")) return Promise.reject("Please enter document type"); return Promise.resolve(); } },
+                  { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: "Must start with an alphabet" },
+                ]}>
+                <InputWithAddon icon={<FileTextOutlined />} placeholder="Enter document type" onChange={() => setFormUpdateTrigger((t) => t + 1)} />
+              </Form.Item>
+            </div>
+
+            {/* Description — textarea with minRows 2, maxRows 6 */}
+            <div className="col-md-4">
+              <Form.Item label="Description" name={["new_org_documents", index, "document_description"]} style={{ marginBottom: "8px" }}
+                rules={[
+                  { validator: (_, value) => { if (field.file && (!value || value.trim() === "")) return Promise.reject("Enter description to upload the document"); return Promise.resolve(); } },
+                  { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: "Must start with an alphabet" },
+                ]}>
+                <Input.TextArea
+                  placeholder="Enter description"
+                  allowClear
+                  autoSize={{ minRows: 2, maxRows: 6 }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.length > 0 && !/^[A-Za-z]/.test(val)) {
+                      form.setFieldValue(["new_org_documents", index, "document_description"], val.replace(/^[^A-Za-z]+/, ""));
+                    }
+                    setFormUpdateTrigger((t) => t + 1);
+                  }}
+                />
+              </Form.Item>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+            <Button type="primary" icon={<CloudUploadOutlined />} loading={field.loading} disabled={isUploadDisabled} onClick={() => uploadDocument(field.id, index, currentOrgId)}>Upload</Button>
+            {index === newDocFields.length - 1 && (
+              <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={addNewDocField} style={{ width: 35, height: 35, backgroundColor: "#28a745", borderColor: "#28a745", color: "#fff" }} />
+            )}
+            <Button type="primary" danger shape="circle" icon={<MinusOutlined />} onClick={() => removeNewDocField(field.id, index)} style={{ width: 35, height: 35, backgroundColor: "red", borderColor: "red" }} />
+          </div>
+        </div>
+      );
+    });
+  };
+
+  // ── Documents Tab ─────────────────────────────────────────────────────────
   const renderDocumentsTab = () => {
     const totalExisting = existingDocs.length;
+    const hasExistingDocs = totalExisting > 0;
     return (
-      <div className="add-org-form-container" >
+      <div className="add-org-form-container">
         {existingDocs.map((doc, idx) => {
           const displayName = doc.document_file?.original_name || "Document";
           const truncatedName = displayName.length > 20 ? displayName.slice(0, 20) + "..." : displayName;
@@ -475,16 +587,14 @@ const AddOrganization = () => {
                 <div className="col-md-4">
                   <Form.Item label="Document Type" style={{ marginBottom: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 11px", border: "1px solid #d9d9d9", borderRadius: "6px", backgroundColor: "#fafafa", minHeight: "36px" }}>
-                      <FileTextOutlined style={{ color: "#8c8c8c" }} />
-                      <span style={{ fontSize: "13px", color: "#333" }}>{doc.document_type || "—"}</span>
+                      <FileTextOutlined style={{ color: "#8c8c8c" }} /><span style={{ fontSize: "13px", color: "#333" }}>{doc.document_type || "—"}</span>
                     </div>
                   </Form.Item>
                 </div>
                 <div className="col-md-4">
                   <Form.Item label="Description" style={{ marginBottom: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 11px", border: "1px solid #d9d9d9", borderRadius: "6px", backgroundColor: "#fafafa", minHeight: "36px" }}>
-                      <FileTextOutlined style={{ color: "#8c8c8c" }} />
-                      <span style={{ fontSize: "13px", color: "#333" }}>{doc.document_description || "—"}</span>
+                      <FileTextOutlined style={{ color: "#8c8c8c" }} /><span style={{ fontSize: "13px", color: "#333" }}>{doc.document_description || "—"}</span>
                     </div>
                   </Form.Item>
                 </div>
@@ -493,63 +603,27 @@ const AddOrganization = () => {
           );
         })}
 
-        <Divider orientation="center" style={{ borderColor: "#d9d9d9" }}>Add New Documents</Divider>
-
-        {newDocFields.map((field, index) => {
-          const globalDocNumber = totalExisting + index + 1;
-          return (
-            <div key={field.id} className="mb-3">
-              {newDocFields.length > 1 && (
-                <Divider orientation="center" style={{ borderTopWidth: "2px", borderColor: "#d9d9d9" }}>{`Document ${globalDocNumber}`}</Divider>
-              )}
-              <div className="row">
-                <div className="col-md-4">
-                  <Form.Item label="File Upload" style={{ marginBottom: "8px" }}>
-                    <Space.Compact style={{ width: "100%", marginBottom: field.file ? "8px" : "0" }}>
-                      <Upload maxCount={1} multiple={false} beforeUpload={(file) => handleFileSelect(file, field.id)} accept=".pdf,.csv,.png,.jpeg,.jpg,.doc,.docx" showUploadList={false} fileList={[]}>
-                        <Button icon={<UploadOutlined />} style={{ width: "100%", textAlign: "left", paddingLeft: "12px" }}>Browse</Button>
-                      </Upload>
-                      <Button icon={<CameraOutlined />} onClick={() => openCamera(field.id)} title="Capture with Camera">Camera</Button>
-                    </Space.Compact>
-                    {field.file && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 11px", border: "1px solid #d9d9d9", borderRadius: "6px", backgroundColor: "#f6ffed" }}>
-                        <div style={{ fontSize: "13px", color: "#52c41a", fontWeight: "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "calc(100% - 30px)" }} title={field.file.name}>
-                          <FileOutlined style={{ marginRight: "5px" }} />
-                          {field.file.name.length > 25 ? field.file.name.substring(0, 25) + "..." : field.file.name}
-                        </div>
-                        <Button icon={<CloseCircleOutlined />} onClick={() => handleClearFile(field.id)} danger type="text" size="small" style={{ padding: "0", height: "auto", marginLeft: "8px" }} />
-                      </div>
-                    )}
-                  </Form.Item>
-                </div>
-                <div className="col-md-4">
-                  <Form.Item label="Document Type" name={["new_org_documents", index, "document_type"]} style={{ marginBottom: "8px" }}
-                    rules={[{ validator: (_, value) => { if (field.file && (!value || value.trim() === "")) return Promise.reject("Please enter document type"); return Promise.resolve(); } }]}>
-                    <InputWithAddon icon={<FileTextOutlined />} placeholder="Enter document type" onChange={() => setFormUpdateTrigger((t) => t + 1)} />
-                  </Form.Item>
-                </div>
-                <div className="col-md-4">
-                  <Form.Item label="Description" name={["new_org_documents", index, "document_description"]} style={{ marginBottom: "8px" }}
-                    rules={[{ validator: (_, value) => { if (field.file && (!value || value.trim() === "")) return Promise.reject("Enter description to upload"); return Promise.resolve(); } }]}>
-                    <InputWithAddon icon={<FileTextOutlined />} placeholder="Enter description" onChange={() => setFormUpdateTrigger((t) => t + 1)} />
-                  </Form.Item>
-                </div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
-                {index === newDocFields.length - 1 && (
-                  <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={addNewDocField} style={{ width: 35, height: 35, backgroundColor: "#28a745", borderColor: "#28a745", color: "#fff" }} />
-                )}
-                {newDocFields.length > 1 && (
-                  <Button type="primary" danger shape="circle" icon={<MinusOutlined />} onClick={() => removeNewDocField(field.id, index)} style={{ width: 35, height: 35, backgroundColor: "red", borderColor: "red" }} />
-                )}
-              </div>
+        {hasExistingDocs ? (
+          !showNewDocFields ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", margin: "24px 0 16px" }}>
+              <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={handleShowNewDocFields} title="Add new document" style={{ width: 40, height: 40, backgroundColor: "#28a745", borderColor: "#28a745", color: "#fff" }} />
             </div>
-          );
-        })}
+          ) : (
+            <>
+              <Divider orientation="center" style={{ borderColor: "#d9d9d9" }}>Add New Documents</Divider>
+              {renderUploadFields(totalExisting)}
+            </>
+          )
+        ) : (
+          <>
+            <Divider orientation="center" style={{ borderColor: "#d9d9d9" }}>Add New Documents</Divider>
+            {renderUploadFields(0)}
+          </>
+        )}
 
         <div className="text-center mt-4" style={{ display: "flex", justifyContent: "center", gap: "12px", marginBottom: "20px" }}>
           <Button size="large" onClick={() => setActiveTab("1")}>Previous</Button>
-          <Button type="primary" size="large" onClick={handleSaveDocuments} loading={loader}>Update</Button>
+          <Button type="primary" size="large" onClick={handleSaveDocuments} loading={loader}>Done</Button>
         </div>
       </div>
     );
@@ -561,121 +635,152 @@ const AddOrganization = () => {
       label: (<span><BankOutlined /> Organization Info</span>),
       children: (
         <div className="add-org-form-container">
-          <div className="row mb-2">
+
+          {/* Row 1: Firm Name | Firm Address */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Firm Name" name="firm_name" rules={[{ required: true, message: "Please enter firm name" }, { pattern: /^[A-Za-z][A-Za-z0-9\s\-,.]*$/, message: "Must start with an alphabet" }]}>
+              <Form.Item label="Firm Name" name="firm_name" style={fi}
+                rules={[{ required: true, message: "Please enter firm name" }, { pattern: /^[A-Za-z][A-Za-z0-9\s\-,.]*$/, message: "Must start with an alphabet" }]}>
                 <InputWithAddon icon={<BankOutlined />} placeholder="Enter firm name" onValueFilter={alphaStartFilter} />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Firm Address" name="firm_address" rules={[{ required: true, message: "Please enter firm address" }]}>
+              <Form.Item label="Firm Address" name="firm_address" style={fi}
+                rules={[{ required: true, message: "Please enter firm address" }]}>
                 <Input.TextArea placeholder="Enter firm address" allowClear autoSize={{ minRows: 2, maxRows: 5 }} />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 2: Proprietor Name | Proprietor Mobile */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Proprietor Name" name="proprietor_name" rules={[{ required: true, message: "Please enter proprietor name" }, { pattern: /^[A-Za-z][A-Za-z\s]*$/, message: "Must start with an alphabet, letters only" }]}>
+              <Form.Item label="Proprietor Name" name="proprietor_name" style={fi}
+                rules={[{ required: true, message: "Please enter proprietor name" }, { pattern: /^[A-Za-z][A-Za-z\s]*$/, message: "Must start with an alphabet, letters only" }]}>
                 <InputWithAddon icon={<UserOutlined />} placeholder="Enter proprietor name"
                   onValueFilter={(value) => { if (!value.length) return ""; let f = ""; for (let i = 0; i < value.length; i++) { if (i === 0) { if (/[A-Za-z]/.test(value[i])) f += value[i]; } else { if (/[A-Za-z\s]/.test(value[i])) f += value[i]; } } return f; }} />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Proprietor Mobile Number" name="proprietor_mobilenumber" rules={[{ required: true, message: "Please enter mobile number" }, { pattern: /^[6-9]\d{9}$/, message: "Enter a valid 10-digit mobile number" }]}>
+              <Form.Item label="Proprietor Mobile Number" name="proprietor_mobilenumber" style={fi}
+                rules={[{ required: true, message: "Please enter mobile number" }, { pattern: /^[6-9]\d{9}$/, message: "Enter a valid 10-digit mobile number" }]}>
                 <InputWithAddon icon={<PhoneOutlined />} placeholder="Enter mobile number" maxLength={10} onValueFilter={numericFilter} />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 3: Door Number | Street Name */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Door Number" name="door_number" rules={[{ required: true, message: "Please enter door number" }]}>
+              <Form.Item label="Door Number" name="door_number" style={fi}
+                rules={[{ required: true, message: "Please enter door number" }]}>
                 <InputWithAddon icon={<HomeOutlined />} placeholder="Enter door number" />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Landmark" name="landmark">
-                <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter landmark" />
-              </Form.Item>
-            </div>
-          </div>
-          <div className="row mb-2">
-            <div className="col-md-6">
-              <Form.Item label="Street Name" name="street_name" rules={[{ required: true, message: "Please enter street name" }]}>
+              <Form.Item label="Street Name" name="street_name" style={fi}
+                rules={[{ required: true, message: "Please enter street name" }]}>
                 <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter street name" />
               </Form.Item>
             </div>
+          </div>
+
+          {/* Row 4: Place | Landmark */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Place" name="place" rules={[{ required: true, message: "Please enter place" }]}>
+              <Form.Item label="Place" name="place" style={fi}
+                rules={[{ required: true, message: "Please enter place" }]}>
                 <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter place"
                   onValueFilter={(value) => { if (!value.length) return ""; let f = ""; for (let i = 0; i < value.length; i++) { if (i === 0) { if (/[A-Za-z]/.test(value[i])) f += value[i]; } else { if (/[A-Za-z\s]/.test(value[i])) f += value[i]; } } return f; }} />
               </Form.Item>
             </div>
-          </div>
-          <div className="row mb-2">
             <div className="col-md-6">
-              <Form.Item label="District" name="district" rules={[{ required: true, message: "Please enter district" }]}>
+              <Form.Item label="Landmark" name="landmark" style={fi}>
+                <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter landmark" />
+              </Form.Item>
+            </div>
+          </div>
+
+          {/* Row 5: District | Pincode */}
+          <div className="row">
+            <div className="col-md-6">
+              <Form.Item label="District" name="district" style={fi}
+                rules={[{ required: true, message: "Please enter district" }]}>
                 <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter district"
                   onValueFilter={(value) => { if (!value.length) return ""; let f = ""; for (let i = 0; i < value.length; i++) { if (i === 0) { if (/[A-Za-z]/.test(value[i])) f += value[i]; } else { if (/[A-Za-z\s]/.test(value[i])) f += value[i]; } } return f; }} />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Pincode" name="pincode" rules={[{ required: true, message: "Please enter pincode" }, { pattern: /^\d{6}$/, message: "Enter a valid 6-digit pincode" }]}>
+              <Form.Item label="Pincode" name="pincode" style={fi}
+                rules={[{ required: true, message: "Please enter pincode" }, { pattern: /^\d{6}$/, message: "Enter a valid 6-digit pincode" }]}>
                 <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter pincode" maxLength={6} onValueFilter={numericFilter} />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 6: State | Geo Location */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="State" name="state" rules={[{ required: true, message: "Please enter state" }]}>
+              <Form.Item label="State" name="state" style={fi}
+                rules={[{ required: true, message: "Please enter state" }]}>
                 <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Enter state" />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Geo Location" name="geo_location">
+              <Form.Item label="Geo Location" name="geo_location" style={fi}>
                 <InputWithAddon icon={<EnvironmentOutlined />} placeholder="Click the map icon to select location" readOnly
                   addonAfter={<Button type="text" icon={<EnvironmentOutlined style={{ color: "#1890ff", fontSize: 16 }} />} onClick={openMapModal} title="Select Location on Map" style={{ display: "flex", alignItems: "center", justifyContent: "center" }} />} />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 7: Landline | Fax */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Landline Number" name="landline_number">
+              <Form.Item label="Landline Number" name="landline_number" style={fi}>
                 <InputWithAddon icon={<PhoneOutlined />} placeholder="e.g. 0422-123456" />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Fax Number" name="fax_number">
+              <Form.Item label="Fax Number" name="fax_number" style={fi}>
                 <InputWithAddon icon={<PhoneOutlined />} placeholder="e.g. 0422-654321" />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 8: Email | Website */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Firm Email" name="firm_email" rules={[{ type: "email", message: "Enter a valid email address" }]}>
+              <Form.Item label="Firm Email" name="firm_email" style={fi}
+                rules={[{ type: "email", message: "Enter a valid email address" }]}>
                 <InputWithAddon icon={<MailOutlined />} placeholder="Enter firm email" />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Website" name="website">
+              <Form.Item label="Website" name="website" style={fi}>
                 <InputWithAddon icon={<GlobalOutlined />} placeholder="e.g. https://example.com" />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 9: Established Date | DOJ — Indian format DD/MM/YYYY */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Firm Established Date" name="firm_established_date">
-                <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" suffixIcon={<CalendarOutlined />} placeholder="Select established date" />
+              <Form.Item label="Firm Established Date" name="firm_established_date" style={fi}>
+                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" suffixIcon={<CalendarOutlined />} placeholder="DD/MM/YYYY" />
               </Form.Item>
             </div>
             <div className="col-md-6">
-              <Form.Item label="Date of Joining (DOJ)" name="doj">
-                <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" suffixIcon={<CalendarOutlined />} placeholder="Select DOJ" />
+              <Form.Item label="Date of Joining (DOJ)" name="doj" style={fi}>
+                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" suffixIcon={<CalendarOutlined />} placeholder="DD/MM/YYYY" />
               </Form.Item>
             </div>
           </div>
-          <div className="row mb-2">
+
+          {/* Row 10: Logo */}
+          <div className="row">
             <div className="col-md-6">
-              <Form.Item label="Firm Logo">
+              <Form.Item label="Firm Logo" style={fi}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div style={{ width: 90, height: 90, borderRadius: 8, border: "1px dashed #d9d9d9", backgroundColor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
                     {logoPreview ? (<img src={logoPreview} alt="Firm Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />) : (
@@ -693,33 +798,34 @@ const AddOrganization = () => {
               </Form.Item>
             </div>
           </div>
+
+          {/* Partner Details */}
           <Divider orientation="center" style={{ borderColor: "#d9d9d9" }}>Partner Details</Divider>
           {partners.map((partner, index) => (
             <div key={partner.id} className="mb-3">
               <div className="row">
                 <div className="col-md-6">
-                  <Form.Item label={`Partner ${index + 1} Name`} style={{ marginBottom: "8px" }}>
+                  <Form.Item label={`Partner ${index + 1} Name`} style={fi}>
                     <InputWithAddon icon={<UserOutlined />} placeholder="Partner name" value={partner.name} onChange={(e) => updatePartner(partner.id, "name", e.target.value)} />
                   </Form.Item>
                 </div>
                 <div className="col-md-6">
-                  <Form.Item label="Mobile" style={{ marginBottom: "8px" }}>
+                  <Form.Item label="Mobile" style={fi}>
                     <InputWithAddon icon={<PhoneOutlined />} placeholder="Mobile number" maxLength={10} value={partner.mobile} onChange={(e) => updatePartner(partner.id, "mobile", numericFilter(e.target.value))} />
                   </Form.Item>
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
                 {index === partners.length - 1 && (
-                  <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={addPartner}
-                    style={{ width: 35, height: 35, backgroundColor: "#28a745", borderColor: "#28a745", color: "#fff" }} />
+                  <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={addPartner} style={{ width: 35, height: 35, backgroundColor: "#28a745", borderColor: "#28a745", color: "#fff" }} />
                 )}
                 {partners.length > 1 && (
-                  <Button type="primary" danger shape="circle" icon={<MinusOutlined />} onClick={() => removePartner(partner.id)}
-                    style={{ width: 35, height: 35, backgroundColor: "red", borderColor: "red" }} />
+                  <Button type="primary" danger shape="circle" icon={<MinusOutlined />} onClick={() => removePartner(partner.id)} style={{ width: 35, height: 35, backgroundColor: "red", borderColor: "red" }} />
                 )}
               </div>
             </div>
           ))}
+
           <div className="text-center mt-4" style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
             <Button size="large" onClick={() => navigate("/organization/list")}>Cancel</Button>
             <Button type="primary" size="large" onClick={handleSaveBasicInfo} loading={loader}>{params.id ? "Update & Next" : "Save & Next"}</Button>
@@ -739,49 +845,30 @@ const AddOrganization = () => {
       {loader && <Loader />}
       <LocationLoadingOverlay visible={isGettingLocation} timer={locationTimer} />
 
-     <div style={{ margin: 0, padding: 0, width: "100%" }}>
-
-  <Form form={form} layout="vertical" style={{ padding: 0 }}>
-    <Tabs
-      activeKey={activeTab}
-      onChange={handleTabChange}
-      items={tabItems}
-      size="large"
-      type="card"
-      className="custom-tabs"
-      style={{ background: "#fff" }}
-      // Make the tab bar (title + tab pills) sticky together
-      renderTabBar={(props, DefaultTabBar) => (
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 1000,
-            backgroundColor: "#fff",
-            boxShadow: isScrolled ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
-            transition: "box-shadow 0.3s ease",
-          }}
-        >
-          {/* Title inside the sticky block */}
-          <div style={{ paddingBottom: "8px" }}>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
-              {params.id ? "Edit Organization" : "Add Organization"}
-            </h2>
-          </div>
-          {/* Tab pills right below the title */}
-          <DefaultTabBar {...props} />
-        </div>
-      )}
-    />
-  </Form>
+      <div style={{ margin: 0, padding: 0, width: "100%" }}>
+        <Form form={form} layout="vertical" style={{ padding: 0 }}>
+          <Tabs
+            activeKey={activeTab}
+            onChange={handleTabChange}
+            items={tabItems}
+            size="large"
+            type="card"
+            className="custom-tabs"
+            style={{ background: "#fff" }}
+            renderTabBar={(props, DefaultTabBar) => (
+              <div style={{ position: "sticky", top: 0, zIndex: 1000, backgroundColor: "#fff", boxShadow: isScrolled ? "0 2px 8px rgba(0,0,0,0.12)" : "none", transition: "box-shadow 0.3s ease" }}>
+                <div style={{ paddingBottom: "8px" }}>
+                  <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>{params.id ? "Edit Organization" : "Add Organization"}</h2>
+                </div>
+                <DefaultTabBar {...props} />
+              </div>
+            )}
+          />
+        </Form>
         <ToastContainer />
       </div>
 
-      <CameraCapture
-        visible={cameraVisible}
-        onClose={() => { setCameraVisible(false); cameraFieldRef.current = { fieldId: null }; }}
-        onCapture={handleCameraCapture}
-      />
+      <CameraCapture visible={cameraVisible} onClose={() => { setCameraVisible(false); cameraFieldRef.current = { fieldId: null }; }} onCapture={handleCameraCapture} />
 
       <Modal
         title={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}><EnvironmentOutlined style={{ color: "#1890ff" }} /><span>Select Organization Location</span></div>}
@@ -815,8 +902,7 @@ const AddOrganization = () => {
           <Button key="close" onClick={() => setPreviewVisible(false)}>Close</Button>,
           <Button key="open" type="primary" onClick={() => window.open(previewContent, "_blank")}>Open in New Tab</Button>,
         ]}
-        onCancel={() => setPreviewVisible(false)} width={900} centered destroyOnClose
-        bodyStyle={{ padding: "16px", margin: 0 }} style={{ top: 20 }}>
+        onCancel={() => setPreviewVisible(false)} width={900} centered destroyOnClose bodyStyle={{ padding: "16px", margin: 0 }} style={{ top: 20 }}>
         <Spin spinning={previewLoading && previewType === "image"}>
           {previewType === "pdf" && previewContent && <SecurePDFPreview url={previewContent} />}
           {previewType === "image" && previewContent && (

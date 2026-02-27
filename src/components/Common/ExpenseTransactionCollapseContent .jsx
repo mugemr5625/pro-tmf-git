@@ -19,11 +19,11 @@ const ExpenseTransactionCollapseContent = ({ expense }) => {
         }}
         contentStyle={{
           fontSize: '18px',
-          fontWeight: 600
+          fontWeight: 600,
         }}
       >
         <Descriptions.Item label="Branch :">
-          {expense.EXPNS_TRNSCTN_BRNCH_NM|| "N/A"}
+          {expense.EXPNS_TRNSCTN_BRNCH_NM || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Line :">
           {expense.EXPNS_TRNSCTN_LINE_NM || "N/A"}
@@ -38,8 +38,8 @@ const ExpenseTransactionCollapseContent = ({ expense }) => {
           {expense.EXPNS_TRNSCTN_MODE || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Transaction Date:">
-          {expense.EXPNS_TRNSCTN_DT 
-            ? dayjs(expense.EXPNS_TRNSCTN_DT).format('DD MMM YYYY') 
+          {expense.EXPNS_TRNSCTN_DT
+            ? dayjs(expense.EXPNS_TRNSCTN_DT).format("DD/MM/YYYY")
             : "N/A"}
         </Descriptions.Item>
         {expense.EXPNS_TRNSCTN_RMRKS && (

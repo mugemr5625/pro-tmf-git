@@ -47,6 +47,7 @@ import { DISBURSE_LOAN } from 'helpers/url_helper';
 import Loader from 'components/Common/Loader';
 import SwipeablePanel from 'components/Common/SwipeablePanel';
 import LoanCollapseContent from 'components/Common/LoanCollapseContent';
+import CompletedLoanCollapseContent from 'components/Common/CompletedLoanCollapseContent';
 import SelectWithAddon from 'components/Common/SelectWithAddon';
 import './DisburseLoanList.css';
 
@@ -97,329 +98,20 @@ const LoanDisbursementList = () => {
   const hasMoreData = pagination.displayed < pagination.total;
   const hasMoreCompletedData = completedPagination.displayed < completedPagination.total;
 
-  // ─── Active dummy data (status: Active) ───────────────────────────────────
-  const dummyApiData = [
-    {
-      "id": 1, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Rajesh Kumar",
-      "LOAN_DSBRSMNT_CUST_CD": 1, "LOAN_DSBRSMNT_CUST_ORDR": 1,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000015", "loan_account_code": 15,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "50000.00",
-      "loan_dsbrsmnt_intrst_amnt": "5000.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "500.00", "loan_dsbrsmnt_instlmnt_amnt": "555.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "555.00", "loan_dsbrsmnt_bad_loan_days": 30,
-      "loan_dsbrsmnt_mode": "Online", "loan_dsbrsmnt_comnt": "First loan - online transfer",
-      "loan_dsbrsmnt_dt": "2026-01-15", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-15T10:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-15T10:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 100, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 2, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Priya Sharma",
-      "LOAN_DSBRSMNT_CUST_CD": 2, "LOAN_DSBRSMNT_CUST_ORDR": 2,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18010101000016", "loan_account_code": 16,
-      "loan_dsbrsmnt_repmnt_type": "Weekly", "loan_dsbrsmnt_amnt": "30000.00",
-      "loan_dsbrsmnt_intrst_amnt": "3000.00", "loan_dsbrsmnt_tot_instlmnt": 52,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "300.00", "loan_dsbrsmnt_instlmnt_amnt": "640.38",
-      "loan_dsbrsmnt_dflt_pay_amnt": "640.38", "loan_dsbrsmnt_bad_loan_days": 45,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Cash disbursement for weekly repayment",
-      "loan_dsbrsmnt_dt": "2026-01-20", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-20T11:30:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-20T11:30:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 101, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 3, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Amit Patel",
-      "LOAN_DSBRSMNT_CUST_CD": 3, "LOAN_DSBRSMNT_CUST_ORDR": 3,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000017", "loan_account_code": 17,
-      "loan_dsbrsmnt_repmnt_type": "Monthly", "loan_dsbrsmnt_amnt": "100000.00",
-      "loan_dsbrsmnt_intrst_amnt": "10000.00", "loan_dsbrsmnt_tot_instlmnt": 12,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "1000.00", "loan_dsbrsmnt_instlmnt_amnt": "9250.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "9250.00", "loan_dsbrsmnt_bad_loan_days": 60,
-      "loan_dsbrsmnt_mode": "Both", "loan_dsbrsmnt_online_amnt": "60000.00", "loan_dsbrsmnt_cash_amnt": "40000.00",
-      "loan_dsbrsmnt_comnt": "Mixed payment - part online, part cash",
-      "loan_dsbrsmnt_online_cmt": "Online transfer of 60k via NEFT", "loan_dsbrsmnt_cash_cmt": "Cash payment of 40k received in office",
-      "loan_dsbrsmnt_dt": "2026-01-25", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-25T09:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-25T09:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 102, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 4, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Amit Patel",
-      "LOAN_DSBRSMNT_CUST_CD": 3, "LOAN_DSBRSMNT_CUST_ORDR": 3,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "fin", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": null,
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "fin", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": null,
-      "loan_account_number": "18000202000018", "loan_account_code": 18,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "25000.00",
-      "loan_dsbrsmnt_intrst_amnt": "2500.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "250.00", "loan_dsbrsmnt_instlmnt_amnt": "277.50",
-      "loan_dsbrsmnt_dflt_pay_amnt": "277.50", "loan_dsbrsmnt_bad_loan_days": 30,
-      "loan_dsbrsmnt_mode": "Online", "loan_dsbrsmnt_comnt": "Second loan for business expansion",
-      "loan_dsbrsmnt_dt": "2026-02-01", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-02-01T10:30:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-01T10:30:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 102, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 5, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Lakshmi Devi",
-      "LOAN_DSBRSMNT_CUST_CD": 4, "LOAN_DSBRSMNT_CUST_ORDR": 4,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18010101000019", "loan_account_code": 19,
-      "loan_dsbrsmnt_repmnt_type": "Weekly", "loan_dsbrsmnt_amnt": "20000.00",
-      "loan_dsbrsmnt_intrst_amnt": "2000.00", "loan_dsbrsmnt_tot_instlmnt": 52,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "200.00", "loan_dsbrsmnt_instlmnt_amnt": "427.69",
-      "loan_dsbrsmnt_dflt_pay_amnt": "427.69", "loan_dsbrsmnt_bad_loan_days": 40,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Cash disbursement for small business",
-      "loan_dsbrsmnt_dt": "2026-01-10", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-10T14:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-10T14:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 103, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 6, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Vijay Anand",
-      "LOAN_DSBRSMNT_CUST_CD": 5, "LOAN_DSBRSMNT_CUST_ORDR": 5,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "fin", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": null,
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "fin", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": null,
-      "loan_account_number": "18010101000020", "loan_account_code": 20,
-      "loan_dsbrsmnt_repmnt_type": "Monthly", "loan_dsbrsmnt_amnt": "75000.00",
-      "loan_dsbrsmnt_intrst_amnt": "7500.00", "loan_dsbrsmnt_tot_instlmnt": 10,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "750.00", "loan_dsbrsmnt_instlmnt_amnt": "8325.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "8325.00", "loan_dsbrsmnt_bad_loan_days": 90,
-      "loan_dsbrsmnt_mode": "Both", "loan_dsbrsmnt_online_amnt": "50000.00", "loan_dsbrsmnt_cash_amnt": "25000.00",
-      "loan_dsbrsmnt_comnt": "Partial online and cash disbursement",
-      "loan_dsbrsmnt_online_cmt": "50k transferred via IMPS to savings account", "loan_dsbrsmnt_cash_cmt": "25k cash handed over at branch office",
-      "loan_dsbrsmnt_dt": "2026-01-28", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-28T13:15:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-28T13:15:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 104, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 7, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Vijay Anand",
-      "LOAN_DSBRSMNT_CUST_CD": 5, "LOAN_DSBRSMNT_CUST_ORDR": 5,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "fin", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": null,
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "fin", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": null,
-      "loan_account_number": "18010101000021", "loan_account_code": 21,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "15000.00",
-      "loan_dsbrsmnt_intrst_amnt": "1500.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "150.00", "loan_dsbrsmnt_instlmnt_amnt": "166.50",
-      "loan_dsbrsmnt_dflt_pay_amnt": "166.50", "loan_dsbrsmnt_bad_loan_days": 30,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Second loan - emergency cash",
-      "loan_dsbrsmnt_dt": "2026-02-03", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-02-03T08:45:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-03T08:45:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 104, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 8, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Meena Kumari",
-      "LOAN_DSBRSMNT_CUST_CD": 6, "LOAN_DSBRSMNT_CUST_ORDR": 6,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000022", "loan_account_code": 22,
-      "loan_dsbrsmnt_repmnt_type": "Weekly", "loan_dsbrsmnt_amnt": "40000.00",
-      "loan_dsbrsmnt_intrst_amnt": "4000.00", "loan_dsbrsmnt_tot_instlmnt": 52,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "400.00", "loan_dsbrsmnt_instlmnt_amnt": "853.85",
-      "loan_dsbrsmnt_dflt_pay_amnt": "853.85", "loan_dsbrsmnt_bad_loan_days": 45,
-      "loan_dsbrsmnt_mode": "Online", "loan_dsbrsmnt_comnt": "Online disbursement via bank transfer",
-      "loan_dsbrsmnt_dt": "2026-01-18", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-18T12:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-18T12:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 105, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 9, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Suresh Babu",
-      "LOAN_DSBRSMNT_CUST_CD": 7, "LOAN_DSBRSMNT_CUST_ORDR": 7,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18010101000023", "loan_account_code": 23,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "12000.00",
-      "loan_dsbrsmnt_intrst_amnt": "1200.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "120.00", "loan_dsbrsmnt_instlmnt_amnt": "133.20",
-      "loan_dsbrsmnt_dflt_pay_amnt": "133.20", "loan_dsbrsmnt_bad_loan_days": 25,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Cash loan for daily needs",
-      "loan_dsbrsmnt_dt": "2026-02-02", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-02-02T11:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-02T11:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 106, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 10, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Suresh Babu",
-      "LOAN_DSBRSMNT_CUST_CD": 7, "LOAN_DSBRSMNT_CUST_ORDR": 7,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18010101000024", "loan_account_code": 24,
-      "loan_dsbrsmnt_repmnt_type": "Weekly", "loan_dsbrsmnt_amnt": "35000.00",
-      "loan_dsbrsmnt_intrst_amnt": "3500.00", "loan_dsbrsmnt_tot_instlmnt": 52,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "350.00", "loan_dsbrsmnt_instlmnt_amnt": "748.08",
-      "loan_dsbrsmnt_dflt_pay_amnt": "748.08", "loan_dsbrsmnt_bad_loan_days": 45,
-      "loan_dsbrsmnt_mode": "Both", "loan_dsbrsmnt_online_amnt": "20000.00", "loan_dsbrsmnt_cash_amnt": "15000.00",
-      "loan_dsbrsmnt_comnt": "Mixed mode disbursement",
-      "loan_dsbrsmnt_online_cmt": "20k via UPI transfer", "loan_dsbrsmnt_cash_cmt": "15k cash at counter",
-      "loan_dsbrsmnt_dt": "2026-02-04", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-02-04T15:30:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-04T15:30:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 106, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 11, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Anitha Reddy",
-      "LOAN_DSBRSMNT_CUST_CD": 8, "LOAN_DSBRSMNT_CUST_ORDR": 8,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000025", "loan_account_code": 25,
-      "loan_dsbrsmnt_repmnt_type": "Monthly", "loan_dsbrsmnt_amnt": "60000.00",
-      "loan_dsbrsmnt_intrst_amnt": "6000.00", "loan_dsbrsmnt_tot_instlmnt": 12,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "600.00", "loan_dsbrsmnt_instlmnt_amnt": "5550.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "5550.00", "loan_dsbrsmnt_bad_loan_days": 60,
-      "loan_dsbrsmnt_mode": "Online", "loan_dsbrsmnt_comnt": "Education loan - online mode",
-      "loan_dsbrsmnt_dt": "2026-01-22", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-22T10:15:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-22T10:15:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 107, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 12, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Kumar Swamy",
-      "LOAN_DSBRSMNT_CUST_CD": 9, "LOAN_DSBRSMNT_CUST_ORDR": 9,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000026", "loan_account_code": 26,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "8000.00",
-      "loan_dsbrsmnt_intrst_amnt": "800.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "80.00", "loan_dsbrsmnt_instlmnt_amnt": "88.80",
-      "loan_dsbrsmnt_dflt_pay_amnt": "88.80", "loan_dsbrsmnt_bad_loan_days": 20,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Small cash loan",
-      "loan_dsbrsmnt_dt": "2026-02-05", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-02-05T09:30:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-05T09:30:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 108, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 13, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Deepa Venkat",
-      "LOAN_DSBRSMNT_CUST_CD": 10, "LOAN_DSBRSMNT_CUST_ORDR": 10,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "fin", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": null,
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "fin", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": null,
-      "loan_account_number": "18010101000027", "loan_account_code": 27,
-      "loan_dsbrsmnt_repmnt_type": "Monthly", "loan_dsbrsmnt_amnt": "90000.00",
-      "loan_dsbrsmnt_intrst_amnt": "9000.00", "loan_dsbrsmnt_tot_instlmnt": 10,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "900.00", "loan_dsbrsmnt_instlmnt_amnt": "9990.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "9990.00", "loan_dsbrsmnt_bad_loan_days": 90,
-      "loan_dsbrsmnt_mode": "Both", "loan_dsbrsmnt_online_amnt": "70000.00", "loan_dsbrsmnt_cash_amnt": "20000.00",
-      "loan_dsbrsmnt_comnt": "Home renovation loan - both modes",
-      "loan_dsbrsmnt_online_cmt": "70k via RTGS to current account", "loan_dsbrsmnt_cash_cmt": "20k cash for immediate expenses",
-      "loan_dsbrsmnt_dt": "2026-01-30", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-30T14:45:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-30T14:45:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 109, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 14, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Naveen Krishna",
-      "LOAN_DSBRSMNT_CUST_CD": 11, "LOAN_DSBRSMNT_CUST_ORDR": 11,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000028", "loan_account_code": 28,
-      "loan_dsbrsmnt_repmnt_type": "Weekly", "loan_dsbrsmnt_amnt": "18000.00",
-      "loan_dsbrsmnt_intrst_amnt": "1800.00", "loan_dsbrsmnt_tot_instlmnt": 52,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "180.00", "loan_dsbrsmnt_instlmnt_amnt": "384.23",
-      "loan_dsbrsmnt_dflt_pay_amnt": "384.23", "loan_dsbrsmnt_bad_loan_days": 35,
-      "loan_dsbrsmnt_mode": "Online", "loan_dsbrsmnt_comnt": "Business working capital",
-      "loan_dsbrsmnt_dt": "2026-01-12", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-01-12T13:20:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-12T13:20:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 110, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 15, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Sangeetha Moorthy",
-      "LOAN_DSBRSMNT_CUST_CD": 12, "LOAN_DSBRSMNT_CUST_ORDR": 12,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "fin", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": null,
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "fin", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": null,
-      "loan_account_number": "18010101000029", "loan_account_code": 29,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "22000.00",
-      "loan_dsbrsmnt_intrst_amnt": "2200.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "220.00", "loan_dsbrsmnt_instlmnt_amnt": "244.20",
-      "loan_dsbrsmnt_dflt_pay_amnt": "244.20", "loan_dsbrsmnt_bad_loan_days": 28,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Daily cash collection loan",
-      "loan_dsbrsmnt_dt": "2026-02-01", "loan_dsbrsmnt_status": "Active",
-      "loan_dsbrsmnt_created_ts": "2026-02-01T08:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-01T08:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 111, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    }
-  ];
+  // Track whether the API genuinely returned zero records (vs. still loading)
+  const [disburseFetched, setDisburseFetched] = useState(false);
+  const [completedFetched, setCompletedFetched] = useState(false);
 
-  // ─── Completed dummy data (status: Completed) ─────────────────────────────
-  const completedDummyData = [
-    {
-      "id": 101, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Karthik Rajan",
-      "LOAN_DSBRSMNT_CUST_CD": 20, "LOAN_DSBRSMNT_CUST_ORDR": 1,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18000202000030", "loan_account_code": 30,
-      "loan_dsbrsmnt_repmnt_type": "Daily", "loan_dsbrsmnt_amnt": "45000.00",
-      "loan_dsbrsmnt_intrst_amnt": "4500.00", "loan_dsbrsmnt_tot_instlmnt": 100,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "450.00", "loan_dsbrsmnt_instlmnt_amnt": "495.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "495.00", "loan_dsbrsmnt_bad_loan_days": 30,
-      "loan_dsbrsmnt_mode": "Online", "loan_dsbrsmnt_comnt": "Completed loan - all instalments paid",
-      "loan_dsbrsmnt_dt": "2025-03-01", "loan_dsbrsmnt_status": "Completed",
-      "loan_dsbrsmnt_created_ts": "2025-03-01T10:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-10T10:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 201, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    },
-    {
-      "id": 102, "LOAN_DSBRSMNT_BRNCH_NM": "Tiruvannamalaisssss", "LOAN_DSBRSMNT_LINE_NM": "Sengammmm",
-      "LOAN_DSBRSMNT_AREA_NM": "Senji Road", "LOAN_DSBRSMNT_CUST_NM": "Bala Murugan",
-      "LOAN_DSBRSMNT_CUST_CD": 21, "LOAN_DSBRSMNT_CUST_ORDR": 2,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "finance", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": "Muge",
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "finance", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": "Muge",
-      "loan_account_number": "18010101000031", "loan_account_code": 31,
-      "loan_dsbrsmnt_repmnt_type": "Monthly", "loan_dsbrsmnt_amnt": "80000.00",
-      "loan_dsbrsmnt_intrst_amnt": "8000.00", "loan_dsbrsmnt_tot_instlmnt": 12,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "800.00", "loan_dsbrsmnt_instlmnt_amnt": "7400.00",
-      "loan_dsbrsmnt_dflt_pay_amnt": "7400.00", "loan_dsbrsmnt_bad_loan_days": 60,
-      "loan_dsbrsmnt_mode": "Both", "loan_dsbrsmnt_online_amnt": "50000.00", "loan_dsbrsmnt_cash_amnt": "30000.00",
-      "loan_dsbrsmnt_comnt": "Home loan fully repaid",
-      "loan_dsbrsmnt_online_cmt": "50k via NEFT", "loan_dsbrsmnt_cash_cmt": "30k cash at branch",
-      "loan_dsbrsmnt_dt": "2025-01-10", "loan_dsbrsmnt_status": "Completed",
-      "loan_dsbrsmnt_created_ts": "2025-01-10T09:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-01-12T09:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 34, "loan_dsbrsmnt_line_id": 35, "loan_dsbrsmnt_area_id": 18,
-      "loan_dsbrsmnt_cust_id": 202, "loan_dsbrsmnt_created_by": 9, "loan_dsbrsmnt_updtd_by": 9
-    },
-    {
-      "id": 103, "LOAN_DSBRSMNT_BRNCH_NM": "Sholinganallur new", "LOAN_DSBRSMNT_LINE_NM": "Sholsssss",
-      "LOAN_DSBRSMNT_AREA_NM": "Karappakkam -II", "LOAN_DSBRSMNT_CUST_NM": "Selvi Natarajan",
-      "LOAN_DSBRSMNT_CUST_CD": 22, "LOAN_DSBRSMNT_CUST_ORDR": 3,
-      "LOAN_DSBRSMNT_CREATED_BY_NM": "fin", "LOAN_DSBRSMNT_CREATED_BY_FULL_NM": null,
-      "LOAN_DSBRSMNT_UPDTD_BY_NM": "fin", "LOAN_DSBRSMNT_UPDTD_BY_FULL_NM": null,
-      "loan_account_number": "18000202000032", "loan_account_code": 32,
-      "loan_dsbrsmnt_repmnt_type": "Weekly", "loan_dsbrsmnt_amnt": "25000.00",
-      "loan_dsbrsmnt_intrst_amnt": "2500.00", "loan_dsbrsmnt_tot_instlmnt": 52,
-      "loan_dsbrsmnt_prcsng_fee_amnt": "250.00", "loan_dsbrsmnt_instlmnt_amnt": "529.81",
-      "loan_dsbrsmnt_dflt_pay_amnt": "529.81", "loan_dsbrsmnt_bad_loan_days": 45,
-      "loan_dsbrsmnt_mode": "Cash", "loan_dsbrsmnt_comnt": "Weekly cash loan - fully closed",
-      "loan_dsbrsmnt_dt": "2025-02-15", "loan_dsbrsmnt_status": "Completed",
-      "loan_dsbrsmnt_created_ts": "2025-02-15T11:00:00.000000Z", "loan_dsbrsmnt_updtd_ts": "2026-02-16T11:00:00.000000Z",
-      "loan_dsbrsmnt_brnch_id": 33, "loan_dsbrsmnt_line_id": 38, "loan_dsbrsmnt_area_id": 24,
-      "loan_dsbrsmnt_cust_id": 203, "loan_dsbrsmnt_created_by": 8, "loan_dsbrsmnt_updtd_by": 8
-    }
-  ];
+  // ─── Mode mapping helper ───────────────────────────────────────────────────
+  // API returns loan_dsbrsmnt_mode as integer: 1 = Cash, 2 = Online, 3 = Both
+  const mapLoanMode = (mode) => {
+    if (mode === 1) return 'Cash';
+    if (mode === 2) return 'Online';
+    if (mode === 3) return 'Both';
+    // Fallback: if API ever returns strings directly, pass them through
+    if (typeof mode === 'string') return mode;
+    return 'Cash';
+  };
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -477,31 +169,56 @@ const LoanDisbursementList = () => {
   const fetchLoanData = async () => {
     try {
       setLoading(true);
-      processApiData(dummyApiData);
+      setDisburseFetched(false);
+      const response = await GET(`api/disburse_loan/`);
+      if (response?.status === 200 && response.data) {
+        // Support both paginated { count, results } and plain array responses
+        const apiData = Array.isArray(response.data)
+          ? response.data
+          : response.data.results ?? [];
+        // count === 0 is a valid empty state, not an error
+        processApiData(apiData);
+      } else {
+        notification.error({ message: 'Failed to fetch loan data' });
+        setLoans([]);
+        setPagination({ displayed: 0, total: 0 });
+      }
     } catch (error) {
       console.error('Error fetching loan data:', error);
+      notification.error({ message: 'Error loading loans. Please try again.' });
       setLoans([]);
       setPagination({ displayed: 0, total: 0 });
     } finally {
       setLoading(false);
+      setDisburseFetched(true);
     }
   };
 
   const fetchCompletedLoanData = async () => {
     try {
       setCompletedLoading(true);
-      // Replace with real API call when ready:
-      // const response = await GET(`${DISBURSE_LOAN}?status=Completed`);
-      // if (response?.status === 200 && response.data) {
-      //   processCompletedApiData(response.data);
-      // }
-      processCompletedApiData(completedDummyData);
+      setCompletedFetched(false);
+      const response = await GET(`api/loan-already-completed/`);
+      if (response?.status === 200 && response.data) {
+        // Support both paginated { count, results } and plain array responses
+        const apiData = Array.isArray(response.data)
+          ? response.data
+          : response.data.results ?? [];
+        // count === 0 is a valid empty state, not an error
+        processCompletedApiData(apiData);
+      } else {
+        notification.error({ message: 'Failed to fetch completed loan data' });
+        setCompletedLoans([]);
+        setCompletedPagination({ displayed: 0, total: 0 });
+      }
     } catch (error) {
       console.error('Error fetching completed loan data:', error);
+      notification.error({ message: 'Error loading completed loans. Please try again.' });
       setCompletedLoans([]);
       setCompletedPagination({ displayed: 0, total: 0 });
     } finally {
       setCompletedLoading(false);
+      setCompletedFetched(true);
     }
   };
 
@@ -528,6 +245,10 @@ const LoanDisbursementList = () => {
           loans: [],
         };
       }
+
+      // Normalise mode: API sends integer (1/2/3), components expect string
+      const modeString = mapLoanMode(loan.loan_dsbrsmnt_mode);
+
       customerMap[custId].loans.push({
         id: loan.id,
         loan_account_number: loan.loan_account_number,
@@ -540,12 +261,15 @@ const LoanDisbursementList = () => {
         loan_dsbrsmnt_instlmnt_amnt: loan.loan_dsbrsmnt_instlmnt_amnt,
         loan_dsbrsmnt_dflt_pay_amnt: loan.loan_dsbrsmnt_dflt_pay_amnt,
         loan_dsbrsmnt_bad_loan_days: loan.loan_dsbrsmnt_bad_loan_days,
-        loan_dsbrsmnt_mode: loan.loan_dsbrsmnt_mode,
-        loan_dsbrsmnt_comnt: loan.loan_dsbrsmnt_comnt,
-        loan_dsbrsmnt_online_amnt: loan.loan_dsbrsmnt_online_amnt,
-        loan_dsbrsmnt_cash_amnt: loan.loan_dsbrsmnt_cash_amnt,
-        loan_dsbrsmnt_online_cmt: loan.loan_dsbrsmnt_online_cmt,
-        loan_dsbrsmnt_cash_cmt: loan.loan_dsbrsmnt_cash_cmt,
+        // Normalised string mode for UI consumption
+        loan_dsbrsmnt_mode: modeString,
+        // Remark field — API uses loan_dsbrsmnt_remark (not loan_dsbrsmnt_comnt)
+        loan_dsbrsmnt_comnt: loan.loan_dsbrsmnt_remark ?? loan.loan_dsbrsmnt_comnt ?? null,
+        // Cash / online split amounts (API: loan_dsbrsmnt_amnt_cash / loan_dsbrsmnt_amnt_online)
+        loan_dsbrsmnt_online_amnt: loan.loan_dsbrsmnt_amnt_online ?? loan.loan_dsbrsmnt_online_amnt ?? null,
+        loan_dsbrsmnt_cash_amnt: loan.loan_dsbrsmnt_amnt_cash ?? loan.loan_dsbrsmnt_cash_amnt ?? null,
+        loan_dsbrsmnt_online_cmt: loan.loan_dsbrsmnt_amnt_online_remark ?? loan.loan_dsbrsmnt_online_cmt ?? null,
+        loan_dsbrsmnt_cash_cmt: loan.loan_dsbrsmnt_amnt_cash_remark ?? loan.loan_dsbrsmnt_cash_cmt ?? null,
         loan_dsbrsmnt_dt: loan.loan_dsbrsmnt_dt,
         loan_dsbrsmnt_status: loan.loan_dsbrsmnt_status,
         loan_dsbrsmnt_created_ts: loan.loan_dsbrsmnt_created_ts,
@@ -574,10 +298,21 @@ const LoanDisbursementList = () => {
   };
 
   const processCompletedApiData = (apiData) => {
-    const customersArray = groupByCustomer(apiData);
-    setCompletedLoans(customersArray);
-    setDisplayedCompletedLoans(customersArray);
-    setCompletedPagination({ displayed: Math.min(PAGE_SIZE, customersArray.length), total: customersArray.length });
+    // Completed API returns a flat list — each item is already one customer summary.
+    // Shape: { customer_order_no, customer_name, customer_id, loan_account_numbers[], total_active_loans }
+    // Normalise to a consistent object so the render function can rely on stable keys.
+    const normalised = apiData.map((item, idx) => ({
+      // Use customer_id as the unique React key; fall back to index
+      id: item.customer_id ?? `completed-${idx}`,
+      customer_id: item.customer_id,
+      customer_name: item.customer_name,
+      customer_order_no: item.customer_order_no,
+      loan_account_numbers: item.loan_account_numbers ?? [],
+      total_active_loans: item.total_active_loans ?? (item.loan_account_numbers?.length ?? 0),
+    }));
+    setCompletedLoans(normalised);
+    setDisplayedCompletedLoans(normalised);
+    setCompletedPagination({ displayed: Math.min(PAGE_SIZE, normalised.length), total: normalised.length });
   };
 
   const filterCustomers = () => {
@@ -618,14 +353,15 @@ const LoanDisbursementList = () => {
     const withoutLeadingZeros = lastNDigits.replace(/^0+/, '');
     return withoutLeadingZeros || '0';
   };
+
   const getMaskedAccountNumber = (accountNumber) => {
-  if (!accountNumber) return '';
-  const str = String(accountNumber);
-  const lastFive = str.slice(-5);
-  const visibleSuffix = lastFive.replace(/^0+/, '') || lastFive.slice(-1);
-  const maskCount = str.length - visibleSuffix.length;
-  return 'x'.repeat(maskCount) + visibleSuffix;
-};
+    if (!accountNumber) return '';
+    const str = String(accountNumber);
+    const lastFive = str.slice(-5);
+    const visibleSuffix = lastFive.replace(/^0+/, '') || lastFive.slice(-1);
+    const maskCount = str.length - visibleSuffix.length;
+    return 'x'.repeat(maskCount) + visibleSuffix;
+  };
 
   const handleAddLoan = (customer) => {
     const customerId = customer.LOAN_DSBRSMNT_CUST_ID || customer.id;
@@ -875,9 +611,15 @@ const LoanDisbursementList = () => {
 
   // ─── Render: COMPLETED item ────────────────────────────────────────────────
   const renderCompletedLoanItem = (customer, index) => {
-    const loanCount = customer.loans?.length || 0;
-    const firstLoan = customer.loans?.[0] || null;
-    const accountSuffix = firstLoan ? getLastNonZeroDigits(firstLoan.loan_account_number, 6) : '';
+    // Completed API shape: { id, customer_id, customer_name, customer_order_no,
+    //                        loan_account_numbers[], total_active_loans }
+    const loanCount    = customer.total_active_loans ?? customer.loan_account_numbers?.length ?? 0;
+    const customerName = customer.customer_name ?? "N/A";
+    const firstAcc     = customer.loan_account_numbers?.[0];
+    // Show the meaningful suffix of the first account number as a label prefix
+    const accountSuffix = firstAcc
+      ? String(firstAcc).slice(-6).replace(/^0+/, '') || String(firstAcc).slice(-1)
+      : '';
 
     if (isMobile) {
       const isExpanded = expandedCompletedCustomers[customer.id];
@@ -885,16 +627,16 @@ const LoanDisbursementList = () => {
         <div key={customer.id} className="loan-mobile-item-wrapper" style={{ marginBottom: '12px' }} data-completed-customer-id={customer.id}>
           <div style={{ position: 'relative' }}>
             <SwipeablePanel
-              item={{ ...customer, lineIndex: index + 1, displayTitle: `${accountSuffix ? accountSuffix + ' - ' : ''}${customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM}` }}
+              item={{ ...customer, lineIndex: index + 1, displayTitle: `${accountSuffix ? accountSuffix + ' - ' : ''}${customerName}` }}
               titleKey="displayTitle" name="completed-loan"
               isSwipeOpen={openCompletedSwipeId === customer.id}
               onSwipeStateChange={(isOpen) => handleCompletedSwipeStateChange(customer.id, isOpen)}
               isExpanded={isExpanded} onExpandToggle={() => handleCompletedExpandToggle(customer)} disableAutoScroll={true}
-              renderContent={() => <LoanCollapseContent customer={customer} loans={customer.loans || []} />}
+              renderContent={() => <CompletedLoanCollapseContent customer={customer} />}
             />
             {!isExpanded && openCompletedSwipeId !== customer.id && (
               <div style={{ position: 'absolute', right: '5px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, display: 'flex', alignItems: 'center', gap: '8px' }}>
-               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', padding: 0, border: '1px solid #d9d9d9', borderRadius: '17.5px', backgroundColor: '#fff', color: 'rgba(0,0,0,0.88)', fontWeight: '600', fontSize: '20px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '5px' }}>{loanCount}</div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', padding: 0, border: '1px solid #b7eb8f', borderRadius: '17.5px', backgroundColor: '#f6ffed', color: '#52c41a', fontWeight: '600', fontSize: '20px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '5px' }}>{loanCount}</div>
               </div>
             )}
           </div>
@@ -912,23 +654,25 @@ const LoanDisbursementList = () => {
               <div className="loan-customer-title-container">
                 <div onClick={() => handleCompletedExpandToggle(customer)} style={{ flex: 1, cursor: 'pointer' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {/* Name row + count badge */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                      <span className="loan-customer-name">{accountSuffix ? `${accountSuffix} - ` : ''}{customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM}</span>
-                      {/* Loan count badge in green for completed */}
-<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #d9d9d9', borderRadius: '19px', backgroundColor: '#fff', fontWeight: '600', fontSize: '22px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '20px' }}>{loanCount}</div>
+                      <span className="loan-customer-name">
+                        {accountSuffix ? `${accountSuffix} - ` : ''}{customerName}
+                      </span>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #b7eb8f', borderRadius: '19px', backgroundColor: '#f6ffed', color: '#52c41a', fontWeight: '600', fontSize: '22px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '20px' }}>{loanCount}</div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                      {customer.loans.map((loan, idx) => (
-                        <div key={idx} style={{ fontSize: '13px', color: '#595959', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>{idx + 1}. {loan.loanAccountNumber || loan.loan_account_number} - ₹{parseFloat(loan.loanAmount || loan.loan_dsbrsmnt_amnt).toLocaleString()}</span>
-                          <Tag color={loan.loan_dsbrsmnt_mode === 'Online' ? 'cyan' : loan.loan_dsbrsmnt_mode === 'Cash' ? 'gold' : loan.loan_dsbrsmnt_mode === 'Both' ? 'purple' : 'default'} style={{ fontSize: '11px' }}>{loan.loan_dsbrsmnt_mode}</Tag>
+                    {/* Account numbers row */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                      {customer.loan_account_numbers?.map((accNo, idx) => (
+                        <div key={idx} style={{ fontSize: '13px', color: '#595959', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{idx + 1}. {accNo}</span>
                           <Tag color="green" style={{ fontSize: '11px' }}>Completed</Tag>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
-                {/* View-only menu — no Add/Edit/Delete for completed */}
+                {/* View-only menu */}
                 <div className="loan-customer-actions">
                   <Dropdown overlay={renderCompletedCustomerMenu(customer)} trigger={['click']}>
                     <EllipsisOutlined className="loan-ellipsis-icon" onClick={(e) => e.stopPropagation()} />
@@ -940,9 +684,52 @@ const LoanDisbursementList = () => {
         </List.Item>
         {expandedCompletedCustomers[customer.id] && (
           <div className="loan-collapse-content" style={{ padding: '16px', background: '#fafafa' }}>
-            <LoanCollapseContent customer={customer} loans={customer.loans || []} />
+            <CompletedLoanCollapseContent customer={customer} />
           </div>
         )}
+      </div>
+    );
+  };
+
+  // ─── Empty State Component ─────────────────────────────────────────────────
+  const EmptyState = ({ type = 'disburse' }) => {
+    const isCompleted = type === 'completed';
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', padding: '60px 24px', textAlign: 'center',
+      }}>
+        {/* Icon */}
+        <div style={{
+          width: '80px', height: '80px', borderRadius: '50%',
+          backgroundColor: isCompleted ? '#f6ffed' : '#f0f5ff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: '20px',
+        }}>
+          <span
+            className={isCompleted ? 'mdi mdi-check-circle-outline' : 'mdi mdi-bank-outline'}
+            style={{ fontSize: '38px', color: isCompleted ? '#52c41a' : '#4096ff' }}
+          />
+        </div>
+        {/* Title */}
+        <Text style={{ fontSize: '17px', fontWeight: '600', color: '#262626', marginBottom: '8px', display: 'block' }}>
+          {isCompleted ? 'No Completed Loans' : 'No Disbursements Yet'}
+        </Text>
+        {/* Subtitle */}
+        <Text type="secondary" style={{ fontSize: '14px', maxWidth: '280px', lineHeight: '1.6', display: 'block', marginBottom: '24px' }}>
+          {isCompleted
+            ? 'Loans that have been fully repaid will appear here.'
+            : 'No loan disbursements have been recorded. Use the + button on a customer card to add one.'}
+        </Text>
+        {/* Refresh button */}
+        <Button
+          icon={<span className="mdi mdi-refresh" style={{ marginRight: '6px' }} />}
+          onClick={isCompleted ? fetchCompletedLoanData : fetchLoanData}
+          size="middle"
+          style={{ borderRadius: '6px' }}
+        >
+          Refresh
+        </Button>
       </div>
     );
   };
@@ -1019,8 +806,8 @@ const LoanDisbursementList = () => {
               >
                 <List dataSource={displayedLoans.slice(0, pagination.displayed)} renderItem={renderLoanItem} />
               </InfiniteScroll>
-              {displayedLoans.length === 0 && !loading && (
-                <div className="loan-no-data"><Text type="secondary" style={{ fontSize: '16px' }}>{showAllCustomers ? 'No customers found' : 'No customers with active loans'}</Text></div>
+              {displayedLoans.length === 0 && !loading && disburseFetched && (
+                <EmptyState type="disburse" />
               )}
             </div>
           </Tabs.TabPane>
@@ -1051,8 +838,8 @@ const LoanDisbursementList = () => {
                   <List dataSource={displayedCompletedLoans.slice(0, completedPagination.displayed)} renderItem={renderCompletedLoanItem} />
                 </InfiniteScroll>
               )}
-              {displayedCompletedLoans.length === 0 && !completedLoading && (
-                <div className="loan-no-data"><Text type="secondary" style={{ fontSize: '16px' }}>No completed loans found</Text></div>
+              {displayedCompletedLoans.length === 0 && !completedLoading && completedFetched && (
+                <EmptyState type="completed" />
               )}
             </div>
           </Tabs.TabPane>
@@ -1107,33 +894,33 @@ const LoanDisbursementList = () => {
         <Form form={loanSelectionForm} layout="vertical">
           <Form.Item name="loanSelection" label="Select Loan" rules={[{ required: true, message: "Please select a loan" }]}>
             <Select size="large" placeholder="Choose a loan to edit" allowClear>
-             {selectedCustomerForEdit?.loans?.map((loan) => {
-  const loanNumber = loan.loanAccountNumber || loan.loan_account_number;
-  const loanAmount = loan.loanAmount || loan.loan_dsbrsmnt_amnt;
-  const maskedNumber = getMaskedAccountNumber(loanNumber);
-  const loanDate = loan.loan_dsbrsmnt_dt
-    ? new Date(loan.loan_dsbrsmnt_dt).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
-    : '';
+              {selectedCustomerForEdit?.loans?.map((loan) => {
+                const loanNumber = loan.loanAccountNumber || loan.loan_account_number;
+                const loanAmount = loan.loanAmount || loan.loan_dsbrsmnt_amnt;
+                const maskedNumber = getMaskedAccountNumber(loanNumber);
+                const loanDate = loan.loan_dsbrsmnt_dt
+                  ? new Date(loan.loan_dsbrsmnt_dt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : '';
 
-  return (
-    <Select.Option key={loan.id} value={loan.id}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>
-          {maskedNumber}
-        </span>
-        <Space size="small">
-          <span style={{ fontSize: '12px', color: '#8c8c8c' }}>{loanDate}</span>
-          <span style={{ fontWeight: 600, color: '#1890ff' }}>
-            ₹{parseFloat(loanAmount).toLocaleString()}
-          </span>
-        </Space>
-      </div>
-    </Select.Option>
-  );
+                return (
+                  <Select.Option key={loan.id} value={loan.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                        {maskedNumber}
+                      </span>
+                      <Space size="small">
+                        <span style={{ fontSize: '12px', color: '#8c8c8c' }}>{loanDate}</span>
+                        <span style={{ fontWeight: 600, color: '#1890ff' }}>
+                          ₹{parseFloat(loanAmount).toLocaleString()}
+                        </span>
+                      </Space>
+                    </div>
+                  </Select.Option>
+                );
               })}
             </Select>
           </Form.Item>

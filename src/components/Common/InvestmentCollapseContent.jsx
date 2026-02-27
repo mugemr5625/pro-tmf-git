@@ -1,6 +1,17 @@
 import React from "react";
 import { Descriptions } from "antd";
 
+// ── Helper: format date string to dd/mm/yyyy ─────────────────────────────────
+const formatIndianDate = (dateStr) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr; // return as-is if unparseable
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 const InvestmentCollapseContent = ({ investment }) => {
   if (!investment) return null;
 
@@ -18,7 +29,7 @@ const InvestmentCollapseContent = ({ investment }) => {
         }}
         contentStyle={{
           fontSize: "18px",
-          fontWeight: 600
+          fontWeight: 600,
         }}
       >
         <Descriptions.Item label="Branch Name:">
@@ -34,7 +45,7 @@ const InvestmentCollapseContent = ({ investment }) => {
           {investment.investment_amount ? `₹${investment.investment_amount}` : "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Investment Date:">
-          {investment.investment_date || "N/A"}
+          {formatIndianDate(investment.investment_date) || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Payment Mode:">
           {investment.payment_mode || "N/A"}

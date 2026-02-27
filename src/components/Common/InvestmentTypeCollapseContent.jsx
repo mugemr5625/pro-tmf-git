@@ -34,7 +34,7 @@ const InvestmentTypeCollapseContent = ({ investmentType }) => {
         <Descriptions.Item label="Entitled To:">
           {investmentType.entitled_to_username || "N/A"}
         </Descriptions.Item>
-        <Descriptions.Item label="Created:">
+        {/* <Descriptions.Item label="Created:">
           {investmentType.created_time
             ? dayjs(investmentType.created_time).format("DD-MMM-YYYY")
             : "N/A"}
@@ -43,7 +43,7 @@ const InvestmentTypeCollapseContent = ({ investmentType }) => {
           {investmentType.modified_time
             ? dayjs(investmentType.modified_time).format("DD-MMM-YYYY")
             : "N/A"}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
       </Descriptions>
     </div>
   );
