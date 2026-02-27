@@ -305,7 +305,7 @@ const AddOrganization = () => {
     const docDescription = form.getFieldValue(["new_org_documents", index, "document_description"]);
 
     if (!file) { notification.error({ message: "Error", description: "Please select a file first.", duration: 3 }); return false; }
-    if (!docType || docType.trim() === "") { form.setFields([{ name: ["new_org_documents", index, "document_type"], errors: ["Please enter document type"] }]); return false; }
+    if (!docType || docType.trim() === "") { form.setFields([{ name: ["new_org_documents", index, "document_type"], errors: ["Please enter document name"] }]); return false; }
     if (!docDescription || docDescription.trim() === "") { form.setFields([{ name: ["new_org_documents", index, "document_description"], errors: ["Please enter description"] }]); return false; }
     if (!(file instanceof File)) { notification.error({ message: "Error", description: "Invalid file object. Please select the file again.", duration: 5 }); return false; }
 
@@ -513,12 +513,12 @@ const AddOrganization = () => {
 
             {/* Document Type */}
             <div className="col-md-4">
-              <Form.Item label="Document Type" name={["new_org_documents", index, "document_type"]} style={{ marginBottom: "8px" }}
+              <Form.Item label="Document Name" name={["new_org_documents", index, "document_type"]} style={{ marginBottom: "8px" }}
                 rules={[
-                  { validator: (_, value) => { if (field.file && (!value || value.trim() === "")) return Promise.reject("Please enter document type"); return Promise.resolve(); } },
+                  { validator: (_, value) => { if (field.file && (!value || value.trim() === "")) return Promise.reject("Please enter document name"); return Promise.resolve(); } },
                   { pattern: /^[A-Za-z][A-Za-z0-9\s]*$/, message: "Must start with an alphabet" },
                 ]}>
-                <InputWithAddon icon={<FileTextOutlined />} placeholder="Enter document type" onChange={() => setFormUpdateTrigger((t) => t + 1)} />
+                <InputWithAddon icon={<FileTextOutlined />} placeholder="Enter document Name" onChange={() => setFormUpdateTrigger((t) => t + 1)} />
               </Form.Item>
             </div>
 
@@ -585,7 +585,7 @@ const AddOrganization = () => {
                   </Form.Item>
                 </div>
                 <div className="col-md-4">
-                  <Form.Item label="Document Type" style={{ marginBottom: "8px" }}>
+                  <Form.Item label="Document Name" style={{ marginBottom: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 11px", border: "1px solid #d9d9d9", borderRadius: "6px", backgroundColor: "#fafafa", minHeight: "36px" }}>
                       <FileTextOutlined style={{ color: "#8c8c8c" }} /><span style={{ fontSize: "13px", color: "#333" }}>{doc.document_type || "—"}</span>
                     </div>

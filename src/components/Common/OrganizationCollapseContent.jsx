@@ -363,12 +363,16 @@ const OrganizationCollapseContent = ({ org, documents = [], documentsLoading = f
   const locationCoords = parseLocation(org.geo_location);
   const NA = "N/A";
 
-  const labelStyle = {
-    fontWeight: 600, background: "#e5e4e4ff", width: "180px", fontSize: "18px",
-  };
-  const contentStyle = {
-    fontSize: "18px", fontWeight: 600, color: "#000", width: "100%",
-  };
+const labelStyle = {
+  fontWeight: 600,
+  background: "#e5e4e4ff",
+  width: "140px",
+  fontSize: "18px",
+};
+const contentStyle = {
+  fontSize: "18px",
+  fontWeight: 600,
+};
 
   return (
     <>
@@ -433,7 +437,7 @@ const OrganizationCollapseContent = ({ org, documents = [], documentsLoading = f
                 >
                   <img src={location2} alt="location" style={{ width: 16, height: 16 }} />
                 </span>
-                <span onClick={() => setShowLocationModal(true)} style={{ color: "#1677ff", textDecoration: "underline", cursor: "pointer" }}>
+                <span onClick={() => setShowLocationModal(true)} style={{ color: "#1677ff", cursor: "pointer" }}>
                   Saved Location
                 </span>
               </span>
@@ -445,19 +449,16 @@ const OrganizationCollapseContent = ({ org, documents = [], documentsLoading = f
           <Descriptions.Item label="DOJ">{formatIndianDate(org.doj) || NA}</Descriptions.Item>
 
           {/* ── Partners ───────────────────────────────────────────────── */}
-          {partners.length > 0 && partners.map((p, i) => (
-            <React.Fragment key={i}>
-              <Descriptions.Item label={`Partner ${i + 1}`}>{p.name || NA}</Descriptions.Item>
-              <Descriptions.Item label={`Partner ${i + 1} Mobile`}>
-                {p.mobile ? (
-                  <IconWithText icon={<PhoneOutlined />} text={p.mobile} onIconClick={() => showAction("phone", p.mobile)} />
-                ) : NA}
-              </Descriptions.Item>
-              {i === partners.length - 1 && partners.length % 3 !== 0 && (
-                <Descriptions.Item label="">{""}</Descriptions.Item>
-              )}
-            </React.Fragment>
-          ))}
+        {partners.length > 0 && partners.map((p, i) => (
+  <React.Fragment key={i}>
+    <Descriptions.Item label={`Partner ${i + 1}`}>{p.name || NA}</Descriptions.Item>
+    <Descriptions.Item label={`Partner ${i + 1} Mobile`}>
+      {p.mobile ? (
+        <IconWithText icon={<PhoneOutlined />} text={p.mobile} onIconClick={() => showAction("phone", p.mobile)} />
+      ) : NA}
+    </Descriptions.Item>
+  </React.Fragment>
+))}
 
           {/* ── Documents (same design as BranchCollapseContent) ───────── */}
           {documentsLoading && (
@@ -473,21 +474,23 @@ const OrganizationCollapseContent = ({ org, documents = [], documentsLoading = f
             const desc    = doc.document_description || "";
             const iconUrl = getFileIcon(fileUrl);
             return (
-              <Descriptions.Item key={`org-doc-${doc.id || index}`} label={docType} span={1}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <img src={iconUrl} alt="File Icon" width={20} height={20} />
-                  <span
-                    onClick={() => handleOpenFile(fileUrl, docType, desc)}
-                    title={desc}
-                    role="button"
-                    tabIndex={0}
-                    style={{ cursor: "pointer" }}
-                    onKeyPress={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpenFile(fileUrl, docType, desc); } }}
-                  >
-                    <Tag color="green" style={{ fontSize: "18px" }}>{truncateText(desc)}</Tag>
-                  </span>
-                </div>
-              </Descriptions.Item>
+             <Descriptions.Item key={`org-doc-${doc.id || index}`} label={docType} span={1}
+  contentStyle={{ fontSize: "18px", fontWeight: 600, color: "#000", padding: "4px 8px", verticalAlign: "middle" }}
+>
+  <div style={{ display: "flex", alignItems: "center", gap: 8, lineHeight: 1 }}>
+    <img src={iconUrl} alt="File Icon" width={20} height={20} style={{ flexShrink: 0 }} />
+    <span
+      onClick={() => handleOpenFile(fileUrl, docType, desc)}
+      title={desc}
+      role="button"
+      tabIndex={0}
+      style={{ cursor: "pointer", lineHeight: 1 }}
+      onKeyPress={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpenFile(fileUrl, docType, desc); } }}
+    >
+      <Tag color="green" style={{ fontSize: "18px", margin: 0 }}>{truncateText(desc)}</Tag>
+    </span>
+  </div>
+</Descriptions.Item>
             );
           })}
         </Descriptions>
