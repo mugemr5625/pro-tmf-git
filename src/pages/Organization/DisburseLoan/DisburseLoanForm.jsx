@@ -30,6 +30,7 @@ import {
   ApartmentOutlined,
   EnvironmentOutlined,
   CommentOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons';
 import { GET, POST, PUT } from 'helpers/api_helper';
 import { devLog } from '../../../utils/environment';
@@ -59,6 +60,11 @@ const DisburseLoanForm = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
 
+  // ── Date states ────────────────────────────────────────────────────────────
+  const [disbursementDt, setDisbursementDt] = useState('');
+  const [firstInstlmntDt, setFirstInstlmntDt] = useState('');
+  const [dayOfInstlmnt, setDayOfInstlmnt] = useState('');
+
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
 
@@ -73,6 +79,12 @@ const DisburseLoanForm = () => {
   // Navigation state
   const navigationState = location.state || {};
   const { mode, customerId, customerName: navCustomerName, loanData } = navigationState;
+
+  // ── Live-watch the three amount fields for the total ───────────────────────
+  const loanAmount     = Form.useWatch('loan_dsbrsmnt_amnt', form)           ?? 0;
+  const interestAmount = Form.useWatch('loan_dsbrsmnt_intrst_amnt', form)    ?? 0;
+  const processingFee  = Form.useWatch('loan_dsbrsmnt_prcsng_fee_amnt', form) ?? 0;
+  const totalAmount    = Number(loanAmount) + Number(interestAmount) + Number(processingFee);
 
   // ── Determine mode ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -92,7 +104,7 @@ const DisburseLoanForm = () => {
     if (navigationState.areaName) setAreaName(navigationState.areaName);
   }, []);
 
-  // ── Fetch customer dropdown — filtered by area_id ──────────────────────────
+  // ── Fetch customer dropdown — filtered by area_id from localStorage ─────────
   const loadCustomerList = useCallback(async (areaIdParam) => {
     try {
       setCustomerLoading(true);
@@ -128,7 +140,8 @@ const DisburseLoanForm = () => {
 
   // ── On mount: load customers filtered by area_id from localStorage ──────────
   useEffect(() => {
-    const selectedAreaId = localStorage.getItem('selected_area_id') ?? null;
+    const selectedAreaId = localStorage.getItem('selected_area_id');
+    console.log('Area id ', selectedAreaId);
     loadCustomerList(selectedAreaId);
   }, [loadCustomerList]);
 
@@ -150,7 +163,10 @@ const DisburseLoanForm = () => {
           setLineName(res.LOAN_DSBRSMNT_LINE_NM ?? res.line_name ?? '');
           setAreaName(res.LOAN_DSBRSMNT_AREA_NM ?? res.area_name ?? '');
 
-          // Re-fetch customer list — prefer loan's own area, fallback to localStorage
+          if (res.loan_dsbrsmnt_dt) setDisbursementDt(res.loan_dsbrsmnt_dt);
+          if (res.first_instlmnt_dt) setFirstInstlmntDt(res.first_instlmnt_dt);
+          if (res.day_of_instlmnt) setDayOfInstlmnt(res.day_of_instlmnt);
+
           const storedAreaId = localStorage.getItem('selected_area_id') ?? null;
           loadCustomerList(res.loan_dsbrsmnt_area_id ?? storedAreaId);
 
@@ -175,6 +191,8 @@ const DisburseLoanForm = () => {
             loan_dsbrsmnt_amnt_cash: res.loan_dsbrsmnt_amnt_cash ?? null,
             loan_dsbrsmnt_amnt_online_remark: res.loan_dsbrsmnt_amnt_online_remark ?? '',
             loan_dsbrsmnt_amnt_cash_remark: res.loan_dsbrsmnt_amnt_cash_remark ?? '',
+            first_instlmnt_dt: res.first_instlmnt_dt ?? '',
+            day_of_instlmnt: res.day_of_instlmnt ?? '',
           });
         })
         .catch((error) => {
@@ -238,13 +256,33 @@ const DisburseLoanForm = () => {
   // ── Payment mode change ────────────────────────────────────────────────────
   const handlePaymentModeChange = (value) => {
     setPaymentMode(value);
-    if (value !== 'Both') {
-      form.setFieldsValue({
-        loan_dsbrsmnt_amnt_online: undefined,
-        loan_dsbrsmnt_amnt_cash: undefined,
-        loan_dsbrsmnt_amnt_online_remark: undefined,
-        loan_dsbrsmnt_amnt_cash_remark: undefined,
-      });
+    form.setFieldsValue({
+      loan_dsbrsmnt_amnt_online: undefined,
+      loan_dsbrsmnt_amnt_cash: undefined,
+      loan_dsbrsmnt_amnt_online_remark: undefined,
+      loan_dsbrsmnt_amnt_cash_remark: undefined,
+    });
+  };
+
+  // ── Disbursement date change ───────────────────────────────────────────────
+  const handleDisbursementDateChange = (e) => {
+    const dateVal = e.target.value;
+    setDisbursementDt(dateVal);
+    form.setFieldsValue({ loan_dsbrsmnt_dt: dateVal });
+  };
+
+  // ── First installment date change ─────────────────────────────────────────
+  const handleFirstInstallmentDateChange = (e) => {
+    const dateVal = e.target.value;
+    setFirstInstlmntDt(dateVal);
+    form.setFieldsValue({ first_instlmnt_dt: dateVal });
+    if (dateVal) {
+      const dayName = new Date(dateVal).toLocaleDateString('en-US', { weekday: 'long' });
+      setDayOfInstlmnt(dayName);
+      form.setFieldsValue({ day_of_instlmnt: dayName });
+    } else {
+      setDayOfInstlmnt('');
+      form.setFieldsValue({ day_of_instlmnt: '' });
     }
   };
 
@@ -253,14 +291,47 @@ const DisburseLoanForm = () => {
     if (!branchId || !lineId || !areaId) {
       notification.error({
         message: 'Missing Required Information',
-        description: 'Branch, Line, and Area information is required. Please select a customer or navigate from the list page.',
+        description: 'Branch, Line, and Area information is required. Please select a customer.',
       });
       return;
+    }
+
+    const firstDate = values.first_instlmnt_dt;
+    const enteredDay = values.day_of_instlmnt;
+    if (firstDate && enteredDay) {
+      const actualDay = new Date(firstDate).toLocaleDateString('en-US', { weekday: 'long' });
+      if (actualDay.toLowerCase() !== enteredDay.toLowerCase()) {
+        notification.error({
+          message: 'Day Mismatch',
+          description: `The selected date falls on a ${actualDay}, but "${enteredDay}" was derived. Please re-select the date.`,
+          duration: 5,
+        });
+        return;
+      }
     }
 
     setLoading(true);
     try {
       const modeInt = MODE_TO_INT[values.loan_dsbrsmnt_mode] ?? '1';
+      const mode = values.loan_dsbrsmnt_mode;
+
+      let cashAmount = null;
+      let onlineAmount = null;
+      let cashRemark = null;
+      let onlineRemark = null;
+
+      if (mode === 'Cash') {
+        cashAmount = String(values.loan_dsbrsmnt_amnt_cash ?? 0);
+        cashRemark = values.loan_dsbrsmnt_amnt_cash_remark ?? null;
+      } else if (mode === 'Online') {
+        onlineAmount = String(values.loan_dsbrsmnt_amnt_online ?? 0);
+        onlineRemark = values.loan_dsbrsmnt_amnt_online_remark ?? null;
+      } else if (mode === 'Both') {
+        cashAmount = String(values.loan_dsbrsmnt_amnt_cash ?? 0);
+        onlineAmount = String(values.loan_dsbrsmnt_amnt_online ?? 0);
+        cashRemark = values.loan_dsbrsmnt_amnt_cash_remark ?? null;
+        onlineRemark = values.loan_dsbrsmnt_amnt_online_remark ?? null;
+      }
 
       const formData = {
         loan_dsbrsmnt_brnch_id: branchId,
@@ -278,14 +349,12 @@ const DisburseLoanForm = () => {
         loan_dsbrsmnt_mode: modeInt,
         loan_dsbrsmnt_remark: values.loan_dsbrsmnt_remark ?? '',
         loan_dsbrsmnt_dt: values.loan_dsbrsmnt_dt,
-        loan_dsbrsmnt_amnt_cash: values.loan_dsbrsmnt_mode === 'Both'
-          ? String(values.loan_dsbrsmnt_amnt_cash ?? 0) : null,
-        loan_dsbrsmnt_amnt_online: values.loan_dsbrsmnt_mode === 'Both'
-          ? String(values.loan_dsbrsmnt_amnt_online ?? 0) : null,
-        loan_dsbrsmnt_amnt_cash_remark: values.loan_dsbrsmnt_mode === 'Both'
-          ? (values.loan_dsbrsmnt_amnt_cash_remark ?? '') : null,
-        loan_dsbrsmnt_amnt_online_remark: values.loan_dsbrsmnt_mode === 'Both'
-          ? (values.loan_dsbrsmnt_amnt_online_remark ?? '') : null,
+        loan_dsbrsmnt_amnt_cash: cashAmount,
+        loan_dsbrsmnt_amnt_online: onlineAmount,
+        loan_dsbrsmnt_amnt_cash_remark: cashRemark,
+        loan_dsbrsmnt_amnt_online_remark: onlineRemark,
+        first_instlmnt_dt: values.first_instlmnt_dt,
+        day_of_instlmnt: values.day_of_instlmnt,
       };
 
       devLog('Submitting formData:', formData);
@@ -384,6 +453,7 @@ const DisburseLoanForm = () => {
     );
   }
 
+  // ── Main render ────────────────────────────────────────────────────────────
   return (
     <Fragment>
       <div className="loan-form-page-content">
@@ -400,7 +470,7 @@ const DisburseLoanForm = () => {
                 <Form form={form} layout="vertical" onFinish={onFinish} className="loan-disbursement-form">
                   <div className="loan-form-container">
 
-                    {/* ── Customer + Date ──────────────────────────────────── */}
+                    {/* ── Customer + Disbursement Date ─────────────────────── */}
                     <div className="row mb-2">
                       <div className="col-md-6">
                         <Form.Item
@@ -453,8 +523,8 @@ const DisburseLoanForm = () => {
                             <input
                               type="date"
                               autoComplete="off"
-                              value={form.getFieldValue('loan_dsbrsmnt_dt') ?? ''}
-                              onChange={(e) => form.setFieldsValue({ loan_dsbrsmnt_dt: e.target.value })}
+                              value={disbursementDt}
+                              onChange={handleDisbursementDateChange}
                               style={{ flex: 1, border: 'none', outline: 'none', padding: '0 11px', fontSize: '14px', width: '100%' }}
                             />
                           </div>
@@ -500,6 +570,61 @@ const DisburseLoanForm = () => {
                     </div>
 
                     <Divider style={{ borderTop: '1px solid #d9d9d9' }} />
+
+                    {/* ── First Installment Date / Day of Installment ──────── */}
+                    <div className="row mb-2">
+                      <div className="col-md-6">
+                        <Form.Item
+                          name="first_instlmnt_dt"
+                          label="First Installment Date"
+                          rules={[{ required: true, message: 'Please select the first installment date' }]}
+                        >
+                          <div style={{ display: 'flex', border: '1px solid #d9d9d9', borderRadius: '6px', overflow: 'hidden', height: '40px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', backgroundColor: '#fafafa', borderRight: '1px solid #d9d9d9', flexShrink: 0 }}>
+                              <CalendarOutlined />
+                            </div>
+                            <input
+                              type="date"
+                              autoComplete="off"
+                              value={firstInstlmntDt}
+                              onChange={handleFirstInstallmentDateChange}
+                              style={{ flex: 1, border: 'none', outline: 'none', padding: '0 11px', fontSize: '14px', width: '100%' }}
+                            />
+                          </div>
+                        </Form.Item>
+                      </div>
+
+                      <div className="col-md-6">
+                        <Form.Item
+                          name="day_of_instlmnt"
+                          label="Day of Installment"
+                          rules={[
+                            { required: true, message: 'Please select a first installment date to auto-fill this field' },
+                            {
+                              validator: (_, value) => {
+                                const firstDate = form.getFieldValue('first_instlmnt_dt');
+                                if (!firstDate || !value) return Promise.resolve();
+                                const actualDay = new Date(firstDate).toLocaleDateString('en-US', { weekday: 'long' });
+                                if (actualDay.toLowerCase() !== value.toLowerCase()) {
+                                  return Promise.reject(new Error(`Date falls on ${actualDay} — day must match`));
+                                }
+                                return Promise.resolve();
+                              },
+                            },
+                          ]}
+                        >
+                          <Input
+                            placeholder="Auto-filled from date (e.g. Wednesday)"
+                            addonBefore={<CalendarOutlined />}
+                            size="large"
+                            value={dayOfInstlmnt}
+                            readOnly
+                            style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                          />
+                        </Form.Item>
+                      </div>
+                    </div>
+
                     <Divider orientation="center">Loan Details</Divider>
 
                     {/* ── Repayment Type / Loan Amount / Interest ───────────── */}
@@ -629,7 +754,67 @@ const DisburseLoanForm = () => {
                       </div>
                     </div>
 
-                    {/* ── Both mode split ───────────────────────────────────── */}
+                    {/* ── Cash mode ─────────────────────────────────────────── */}
+                    {paymentMode === 'Cash' && (
+                      <>
+                        <Divider style={{ borderTop: '1px solid #d9d9d9' }} />
+                        <Divider orientation="center">Cash Payment Details</Divider>
+                        <div className="row mb-2">
+                          <div className="col-md-6">
+                            <Form.Item
+                              name="loan_dsbrsmnt_amnt_cash"
+                              label="Cash Amount"
+                              rules={[{ required: true, message: 'Please enter cash amount' }]}
+                            >
+                              <InputNumber
+                                style={{ width: '100%' }} placeholder="Enter Cash Amount"
+                                min={0} precision={2} size="large" prefix="₹" addonBefore={<WalletOutlined />}
+                              />
+                            </Form.Item>
+                          </div>
+                          <div className="col-md-6">
+                            <Form.Item name="loan_dsbrsmnt_amnt_cash_remark" label="Cash Payment Remarks">
+                              <TextArea
+                                placeholder="Enter cash payment remarks"
+                                autoSize={{ minRows: 2, maxRows: 6 }} allowClear
+                              />
+                            </Form.Item>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* ── Online mode ───────────────────────────────────────── */}
+                    {paymentMode === 'Online' && (
+                      <>
+                        <Divider style={{ borderTop: '1px solid #d9d9d9' }} />
+                        <Divider orientation="center">Online Payment Details</Divider>
+                        <div className="row mb-2">
+                          <div className="col-md-6">
+                            <Form.Item
+                              name="loan_dsbrsmnt_amnt_online"
+                              label="Online Amount"
+                              rules={[{ required: true, message: 'Please enter online amount' }]}
+                            >
+                              <InputNumber
+                                style={{ width: '100%' }} placeholder="Enter Online Amount"
+                                min={0} precision={2} size="large" prefix="₹" addonBefore={<BankOutlined />}
+                              />
+                            </Form.Item>
+                          </div>
+                          <div className="col-md-6">
+                            <Form.Item name="loan_dsbrsmnt_amnt_online_remark" label="Online Payment Remarks">
+                              <TextArea
+                                placeholder="Enter online payment remarks"
+                                autoSize={{ minRows: 2, maxRows: 6 }} allowClear
+                              />
+                            </Form.Item>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* ── Both mode ─────────────────────────────────────────── */}
                     {paymentMode === 'Both' && (
                       <>
                         <Divider style={{ borderTop: '1px solid #d9d9d9' }} />
@@ -681,6 +866,18 @@ const DisburseLoanForm = () => {
                       </>
                     )}
 
+                    {/* ── Total Amount (read-only, live computed) ───────────── */}
+                    <div className="row mb-2">
+                      <div className="col-md-12">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
+                          <span style={{ fontSize: '15px', fontWeight: '600', color: '#262626' }}>Total Amount :</span>
+                          <span style={{ fontSize: '16px', fontWeight: '700', color: '#1677ff' }}>
+                            ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* ── Remark ────────────────────────────────────────────── */}
                     <div className="row mb-2">
                       <div className="col-md-12">
@@ -709,7 +906,6 @@ const DisburseLoanForm = () => {
                   </div>
                 </Form>
               </div>
-
             </div>
           </div>
         </div>

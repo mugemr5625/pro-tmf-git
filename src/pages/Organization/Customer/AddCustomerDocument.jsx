@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { notification, Form, Input, Button, Upload, message, Divider, Space, Card, Spin, Modal, Dropdown, Menu } from "antd";
-import { UploadOutlined, CloudUploadOutlined, FileOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, MinusOutlined, CloseCircleOutlined, CameraOutlined, DownOutlined } from '@ant-design/icons';
+import { UploadOutlined, CloudUploadOutlined, FileOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, MinusOutlined, CloseCircleOutlined, CameraOutlined } from '@ant-design/icons';
 import { UPLOAD, GET, DELETE } from "helpers/api_helper";
 import { useNavigate } from "react-router-dom";
 import CameraCapture from '../../../components/Common/CameraCapture';
 
 // Location photo slot definitions (order matters)
 const LOCATION_SLOTS = [
-  { key: 'building',          label: 'Customer Building',                 defaultDescription: 'Customer Building' },
-  { key: 'left_building',     label: 'Left to the Building',     defaultDescription: 'Left to Building'  },
-  { key: 'opposite_building', label: 'Opposite to the Building', defaultDescription: 'Opp to Building'   },
-  { key: 'right_building',    label: 'Right to the Building',    defaultDescription: 'Right to Building' },
+  { key: 'building',          label: 'Customer Building' },
+  { key: 'left_building',     label: 'Left to the Building' },
+  { key: 'opposite_building', label: 'Opposite to the Building' },
+  { key: 'right_building',    label: 'Right to the Building' },
 ];
 
 const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel }) => {
@@ -22,9 +22,8 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
   const [otherFields,   setOtherFields]   = useState([{ id: 0, file: null, loading: false }]);
 
   // Location slots: { slotKey, file, loading, active }
-  // Only "building" is active by default
   const [locationSlots, setLocationSlots] = useState([
-    { slotKey: 'building',          file: null, loading: false, active: true  },
+    { slotKey: 'building',          file: null, loading: false, active: false },
     { slotKey: 'left_building',     file: null, loading: false, active: false },
     { slotKey: 'opposite_building', file: null, loading: false, active: false },
     { slotKey: 'right_building',    file: null, loading: false, active: false },
@@ -76,7 +75,6 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
       message.error('Camera field info missing. Please try again.');
       return;
     }
-
     if (!(file instanceof File)) {
       message.error('Invalid file received from camera');
       return;
@@ -122,14 +120,11 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
 
     if (docsByType.aadhaar.length > 0)
       setAadhaarFields(docsByType.aadhaar.map((_, i) => ({ id: i, file: null, loading: false })));
-
     if (docsByType.pan.length > 0)
       setPanFields(docsByType.pan.map((_, i) => ({ id: i, file: null, loading: false })));
-
     if (docsByType.other.length > 0)
       setOtherFields(docsByType.other.map((_, i) => ({ id: i, file: null, loading: false })));
 
-    // For location slots, activate the ones that already have documents
     if (docsByType.location_photo.length > 0) {
       setLocationSlots(prev =>
         prev.map((slot, idx) => ({
@@ -151,7 +146,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
       }
 
       let documents = [];
-      if (response && Array.isArray(response.data))  documents = response.data;
+      if (response && Array.isArray(response.data)) documents = response.data;
       else if (response && Array.isArray(response))  documents = response;
 
       setExistingDocuments(documents);
@@ -183,11 +178,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
     } catch (error) {
       setExistingDocuments([]);
       if (!error.message?.includes('Customer not found')) {
-        notification.error({
-          message: 'Error',
-          description: 'Failed to fetch existing documents',
-          duration: 5,
-        });
+        notification.error({ message: 'Error', description: 'Failed to fetch existing documents', duration: 5 });
       }
     } finally {
       setLoadingDocuments(false);
@@ -214,22 +205,16 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
 
             const deletedDoc = existingDocuments.find(doc => doc.id === docId);
 
-            // Clear description form field for non-location types
             if (deletedDoc && deletedDoc.document_type !== 'location_photo') {
               const docsOfSameType = existingDocuments.filter(doc => doc.document_type === deletedDoc.document_type);
               const deletedIndex   = docsOfSameType.findIndex(doc => doc.id === docId);
-              const prefixMap = {
-                aadhaar: 'aadhaar_description',
-                pan:     'pan_description',
-                other:   'other_description',
-              };
+              const prefixMap = { aadhaar: 'aadhaar_description', pan: 'pan_description', other: 'other_description' };
               const prefix = prefixMap[deletedDoc.document_type];
               if (prefix && deletedIndex !== -1) {
                 form.setFieldValue(`${prefix}_${deletedIndex}`, '');
               }
             }
 
-            // If it's a location doc, deactivate that slot
             if (deletedDoc?.document_type === 'location_photo') {
               const locDocs = existingDocuments.filter(d => d.document_type === 'location_photo');
               const locIdx  = locDocs.findIndex(d => d.id === docId);
@@ -273,11 +258,10 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
                 setFormUpdateTrigger(prev => prev + 1);
               }, 100);
             } else {
-              // If no documents left, reset to initial state
               setAadhaarFields([{ id: 0, file: null, loading: false }]);
               setPanFields([{ id: 0, file: null, loading: false }]);
               setOtherFields([{ id: 0, file: null, loading: false }]);
-              setLocationSlots(prev => prev.map((s, i) => ({ ...s, active: i === 0, file: null })));
+              setLocationSlots(prev => prev.map((s) => ({ ...s, active: false, file: null })));
               form.resetFields();
             }
           } else {
@@ -310,11 +294,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
     return (
       <div style={{ margin: 0, padding: 0 }}>
         <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-          >
+          <Button type="primary" size="small" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
             Open PDF in New Tab
           </Button>
         </div>
@@ -387,7 +367,6 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
   };
 
   const deactivateLocationSlot = (slotKey) => {
-    if (slotKey === 'building') return; // building is always shown
     setLocationSlots(prev =>
       prev.map(s => s.slotKey === slotKey ? { ...s, active: false, file: null } : s)
     );
@@ -423,9 +402,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
       return;
     }
 
-     const slotDef = LOCATION_SLOTS.find(s => s.key === slotKey);
-  const slotLabel = slotDef?.label || slotKey;
-  const defaultDescription = slotDef?.defaultDescription || slotLabel;
+    const slotLabel = LOCATION_SLOTS.find(s => s.key === slotKey)?.label || slotKey;
 
     setLocationSlots(prev =>
       prev.map(s => s.slotKey === slotKey ? { ...s, loading: true } : s)
@@ -435,7 +412,6 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
       const formData = new FormData();
       formData.append('document_type', 'location_photo');
       formData.append('document_description', slotLabel);
-       formData.append('document_description', defaultDescription); 
       formData.append('document_file', file, file.name);
 
       const response = await UPLOAD(`/api/customer-documents/?customer_id=${customerId}`, formData);
@@ -479,16 +455,13 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
   /* ───────────── NON-LOCATION ADD / REMOVE ───────────── */
 
   const addAadhaarField = () => {
-    if (aadhaarFields.length < 2)
-      setAadhaarFields([...aadhaarFields, { id: Date.now(), file: null, loading: false }]);
+    if (aadhaarFields.length < 2) setAadhaarFields([...aadhaarFields, { id: Date.now(), file: null, loading: false }]);
   };
   const addPanField = () => {
-    if (panFields.length < 2)
-      setPanFields([...panFields, { id: Date.now(), file: null, loading: false }]);
+    if (panFields.length < 2) setPanFields([...panFields, { id: Date.now(), file: null, loading: false }]);
   };
   const addOtherField = () => {
-    if (otherFields.length < 4)
-      setOtherFields([...otherFields, { id: Date.now(), file: null, loading: false }]);
+    if (otherFields.length < 4) setOtherFields([...otherFields, { id: Date.now(), file: null, loading: false }]);
   };
 
   const removeAadhaarField = (id) => {
@@ -525,10 +498,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
       return;
     }
     if (!description || description.trim() === '') {
-      form.setFields([{
-        name: `${descriptionField}_${fieldId}`,
-        errors: ['Please enter description to upload the document'],
-      }]);
+      form.setFields([{ name: `${descriptionField}_${fieldId}`, errors: ['Please enter description to upload the document'] }]);
       return;
     }
     if (!(file instanceof File)) {
@@ -579,7 +549,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
     setAadhaarFields([{ id: 0, file: null, loading: false }]);
     setPanFields([{ id: 0, file: null, loading: false }]);
     setOtherFields([{ id: 0, file: null, loading: false }]);
-    setLocationSlots(prev => prev.map((s, i) => ({ ...s, active: i === 0, file: null })));
+    setLocationSlots(prev => prev.map((s) => ({ ...s, active: false, file: null })));
   };
 
   /* ───────────── RENDER LOCATION PHOTO SECTION ───────────── */
@@ -589,7 +559,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
     const activeSlots     = locationSlots.filter(s => s.active);
     const allSlotsActive  = locationSlots.every(s => s.active);
 
-    // Build dropdown menu with only inactive slots as options
+    // Dropdown menu showing all currently inactive slots
     const dropdownMenu = (
       <Menu
         onClick={({ key }) => activateLocationSlot(key)}
@@ -605,6 +575,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
 
     return (
       <>
+        {/* Active slots — each with its own divider + label */}
         {activeSlots.map((slot, idx) => {
           const slotDef      = LOCATION_SLOTS.find(s => s.key === slot.slotKey);
           const slotLabel    = slotDef?.label || slot.slotKey;
@@ -615,12 +586,13 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
           const isLastActive = idx === activeSlots.length - 1;
 
           return (
-            <div key={slot.slotKey} className="mb-3">
+            <div key={slot.slotKey}>
 
-              {/* Slot label */}
-              <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '8px', color: '#333' }}>
+              {/* Divider + label — same style as Aadhaar/PAN/Other */}
+              {/* <Divider style={{ borderTop: '2px solid #d9d9d9' }} /> */}
+              <Divider orientation="center" style={{ borderTopWidth: '3px', borderColor: '#d9d9d9' }}>
                 {slotLabel}
-              </div>
+              </Divider>
 
               {/* Existing document card */}
               {hasExisting && existingDoc && (
@@ -661,7 +633,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
                 </div>
               )}
 
-              {/* Upload row — NO description field for location */}
+              {/* Upload row */}
               <div className="row">
                 <div className="col-md-6">
                   <Form.Item label="File Upload" style={{ marginBottom: '8px' }}>
@@ -744,26 +716,20 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
                   Upload
                 </Button>
 
-                {/* + dropdown — only on the last active slot when more slots are available */}
+                {/* + dropdown on last active slot — shows remaining inactive options */}
                 {isLastActive && !allSlotsActive && (
                   <Dropdown overlay={dropdownMenu} trigger={['click']}>
                     <Button
                       type="primary"
                       shape="circle"
                       icon={<PlusOutlined />}
-                      style={{
-                        width: 35,
-                        height: 35,
-                        backgroundColor: '#28a745',
-                        borderColor: '#28a745',
-                        color: '#fff',
-                      }}
+                      style={{ width: 35, height: 35, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
                     />
                   </Dropdown>
                 )}
 
-                {/* − remove button (not for the building slot) */}
-                {slot.slotKey !== 'building' && !hasExisting && (
+                {/* − remove button for any active slot */}
+                {!hasExisting && (
                   <Button
                     type="primary"
                     danger
@@ -777,6 +743,20 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
             </div>
           );
         })}
+
+        {/* When NO slots are active yet — show only the + dropdown button */}
+        {activeSlots.length === 0 && !allSlotsActive && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+            <Dropdown overlay={dropdownMenu} trigger={['click']}>
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<PlusOutlined />}
+                style={{ width: 35, height: 35, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
+              />
+            </Dropdown>
+          </div>
+        )}
       </>
     );
   };
@@ -840,7 +820,6 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
 
               {/* File Upload + Description row */}
               <div className="row">
-                {/* File Upload Column */}
                 <div className="col-md-6">
                   <Form.Item label="File Upload" style={{ marginBottom: '8px' }}>
                     <Space.Compact style={{ width: '100%', marginBottom: field.file ? '8px' : '0' }}>
@@ -910,7 +889,6 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
                   </Form.Item>
                 </div>
 
-                {/* Description Column */}
                 <div className="col-md-6">
                   <Form.Item
                     label="Description"
@@ -968,24 +946,16 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
                   Upload
                 </Button>
 
-                {/* + button on last field when below max */}
                 {index === fields.length - 1 && fields.length < maxFields && (
                   <Button
                     type="primary"
                     shape="circle"
                     icon={<PlusOutlined />}
                     onClick={addHandler}
-                    style={{
-                      width: 35,
-                      height: 35,
-                      backgroundColor: '#28a745',
-                      borderColor: '#28a745',
-                      color: '#fff',
-                    }}
+                    style={{ width: 35, height: 35, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff' }}
                   />
                 )}
 
-                {/* − button when more than 1 field and no existing doc */}
                 {fields.length > 1 && !hasExistingDoc && (
                   <Button
                     type="primary"
@@ -1054,7 +1024,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
                     addPanField, removePanField, 2
                   )}
 
-                  {/* Location Photo */}
+                  {/* Location Photo — first slot header rendered here; subsequent slot headers rendered inside renderLocationPhotoSection */}
                   <Divider style={{ borderTop: '2px solid #d9d9d9' }} />
                   <Divider orientation="center" style={{ borderTopWidth: '3px', borderColor: '#d9d9d9' }}>
                     Location Photo
@@ -1096,9 +1066,7 @@ const AddCustomerDocument = ({ customerId, customerName, onPrevious, onCancel })
               open={previewVisible}
               title="Document Preview"
               footer={[
-                <Button key="close" onClick={() => setPreviewVisible(false)}>
-                  Close
-                </Button>,
+                <Button key="close" onClick={() => setPreviewVisible(false)}>Close</Button>,
                 <Button key="download" type="primary" onClick={() => window.open(previewContent, '_blank')}>
                   Open in New Tab
                 </Button>,
