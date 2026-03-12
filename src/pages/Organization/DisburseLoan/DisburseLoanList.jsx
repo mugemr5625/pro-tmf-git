@@ -1,58 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Button,
-  Checkbox,
-  Collapse,
-  Tabs,
-  List,
-  Tag,
-  Divider,
-  Skeleton,
-  Modal,
-  Dropdown,
-  Menu,
-  FloatButton,
-  notification,
-  Typography,
-  Row,
-  Col,
-  Space,
-  Card,
-  Grid,
-  Image,
-  Popconfirm,
-  Form,
-  Input,
-  Select,
-  DatePicker,
-  Spin,
+  Button, Checkbox, Collapse, Tabs, List, Tag, Divider, Skeleton, Modal,
+  Dropdown, Menu, notification, Typography, Row, Col, Space, Card, Grid,
+  Popconfirm, Form, Select, Spin,
 } from 'antd';
 import {
-  SearchOutlined,
-  FilterOutlined,
-  EllipsisOutlined,
-  PlusOutlined,
-  DeleteFilled,
-  ExclamationCircleOutlined,
-  SwapOutlined,
-  EditOutlined,
-  ApartmentOutlined,
-  CalendarOutlined,
-  EnvironmentOutlined,
+  FilterOutlined, EllipsisOutlined, PlusOutlined, DeleteFilled,
+  ExclamationCircleOutlined, SwapOutlined,
 } from '@ant-design/icons';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useNavigate } from 'react-router-dom';
 import { GET } from 'helpers/api_helper';
-import { DISBURSE_LOAN } from 'helpers/url_helper';
 import Loader from 'components/Common/Loader';
 import SwipeablePanel from 'components/Common/SwipeablePanel';
-import LoanCollapseContent from 'components/Common/LoanCollapseContent';
 import CompletedLoanCollapseContent from 'components/Common/CompletedLoanCollapseContent';
-import SelectWithAddon from 'components/Common/SelectWithAddon';
 import './DisburseLoanList.css';
 
-const { Panel } = Collapse;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
 const LoanDisbursementList = () => {
@@ -60,406 +24,298 @@ const LoanDisbursementList = () => {
   const isMobile = !screens.md;
   const navigate = useNavigate();
 
+  // ── Loading states ──────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
-  const [loans, setLoans] = useState([]);
-  const [displayedLoans, setDisplayedLoans] = useState([]);
+  const [completedLoading, setCompletedLoading] = useState(false);
+  const [allActiveLoading, setAllActiveLoading] = useState(false);
+  const [expandLoading, setExpandLoading] = useState(false);
+
+  // ── Data states ─────────────────────────────────────────────────────────────
+  const [loanToBeCompleted, setLoanToBeCompleted] = useState([]);
+  const [allActiveLoans, setAllActiveLoans] = useState([]);
+  // disburseLoanMap keyed by loan id (string) -> loan object
+  const [disburseLoanMap, setDisburseLoanMap] = useState({});
+  const [disburseLoanFetched, setDisburseLoanFetched] = useState(false);
+  const [completedLoans, setCompletedLoans] = useState([]);
+
+  // ── Display / pagination ────────────────────────────────────────────────────
+  const [displayedLoanToBeCompleted, setDisplayedLoanToBeCompleted] = useState([]);
+  const [displayedAllActive, setDisplayedAllActive] = useState([]);
+  const [displayedCompleted, setDisplayedCompleted] = useState([]);
   const [showAllCustomers, setShowAllCustomers] = useState(false);
   const [activeTab, setActiveTab] = useState('pay');
-  const [accordionOpen, setAccordionOpen] = useState(true);
-  const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [openSwipeId, setOpenSwipeId] = useState(null);
-  const [expandedCustomers, setExpandedCustomers] = useState({});
-  const [loanSelectionModalVisible, setLoanSelectionModalVisible] = useState(false);
-  const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState(null);
-  const [loanSelectionForm] = Form.useForm();
-  const [searchForm] = Form.useForm();
-  const [lineDropdownList, setLineDropdownList] = useState([]);
-  const [areaDropdownList, setAreaDropdownList] = useState([]);
-  const [filteredAreaList, setFilteredAreaList] = useState([]);
-  const [lineLoading, setLineLoading] = useState(false);
-  const [areaLoading, setAreaLoading] = useState(false);
-  const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
-  const [selectedLineId, setSelectedLineId] = useState(null);
-  const [lastScrollY, setLastScrollY] = useState(0);
 
-  // Pagination state for infinite scroll
-  const [pagination, setPagination] = useState({ displayed: 10, total: 0 });
   const PAGE_SIZE = 10;
-
-  // ─── Completed tab state ───────────────────────────────────────────────────
-  const [completedLoans, setCompletedLoans] = useState([]);
-  const [displayedCompletedLoans, setDisplayedCompletedLoans] = useState([]);
-  const [completedLoading, setCompletedLoading] = useState(false);
+  const [pagination, setPagination] = useState({ displayed: 10, total: 0 });
+  const [allActivePagination, setAllActivePagination] = useState({ displayed: 10, total: 0 });
   const [completedPagination, setCompletedPagination] = useState({ displayed: 10, total: 0 });
-  const [expandedCompletedCustomers, setExpandedCompletedCustomers] = useState({});
-  const [openCompletedSwipeId, setOpenCompletedSwipeId] = useState(null);
 
-  const hasMoreData = pagination.displayed < pagination.total;
-  const hasMoreCompletedData = completedPagination.displayed < completedPagination.total;
-
-  // Track whether the API genuinely returned zero records (vs. still loading)
-  const [disburseFetched, setDisburseFetched] = useState(false);
+  // ── Fetched flags ───────────────────────────────────────────────────────────
+  const [loanToBeCompletedFetched, setLoanToBeCompletedFetched] = useState(false);
+  const [allActiveFetched, setAllActiveFetched] = useState(false);
   const [completedFetched, setCompletedFetched] = useState(false);
 
-  // ─── Mode mapping helper ───────────────────────────────────────────────────
-  // API returns loan_dsbrsmnt_mode as integer: 1 = Cash, 2 = Online, 3 = Both
+  // ── UI states ───────────────────────────────────────────────────────────────
+  const [accordionOpen, setAccordionOpen] = useState(true);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [openSwipeId, setOpenSwipeId] = useState(null);
+  const [openCompletedSwipeId, setOpenCompletedSwipeId] = useState(null);
+  const [expandedCustomerId, setExpandedCustomerId] = useState(null);
+  const [expandedCompletedCustomerId, setExpandedCompletedCustomerId] = useState(null);
+  const [loanSelectionModalVisible, setLoanSelectionModalVisible] = useState(false);
+  const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState(null);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  // ── Form instances ──────────────────────────────────────────────────────────
+  const [loanSelectionForm] = Form.useForm();
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
   const mapLoanMode = (mode) => {
-    if (mode === 1) return 'Cash';
-    if (mode === 2) return 'Online';
-    if (mode === 3) return 'Both';
-    // Fallback: if API ever returns strings directly, pass them through
+    if (mode === 1 || mode === '1') return 'Cash';
+    if (mode === 2 || mode === '2') return 'Online';
+    if (mode === 3 || mode === '3') return 'Both';
     if (typeof mode === 'string') return mode;
     return 'Cash';
   };
 
-  // ─── Lifecycle ─────────────────────────────────────────────────────────────
+  const getLastNonZeroDigits = (acc, n = 6) => {
+    if (!acc) return '';
+    return String(acc).slice(-n).replace(/^0+/, '') || '0';
+  };
+
+  const getMaskedAccountNumber = (acc) => {
+    if (!acc) return '';
+    const s = String(acc), last5 = s.slice(-5);
+    const vis = last5.replace(/^0+/, '') || last5.slice(-1);
+    return 'x'.repeat(s.length - vis.length) + vis;
+  };
+
+  // ── On mount: fetch loan-to-be-completed ────────────────────────────────────
   useEffect(() => {
-    const fetchDropdownData = async () => {
-      try {
-        setLineLoading(true);
-        const lineResponse = await GET("api/line_dd");
-        if (lineResponse?.status === 200) {
-          setLineDropdownList(lineResponse.data);
-        } else {
-          notification.error({ message: "Failed to fetch lines" });
-          setLineDropdownList([]);
-        }
-      } catch (error) {
-        console.error("Error fetching dropdown data:", error);
-        notification.error({ message: "Failed to load dropdown data" });
-        setLineDropdownList([]);
-      } finally {
-        setLineLoading(false);
-      }
-    };
-    fetchDropdownData();
+    fetchLoanToBeCompleted();
   }, []);
 
-  useEffect(() => { fetchLoanData(); }, []);
-
-  // Load completed data when COMPLETED tab is first opened
+  // ── Fetch completed when tab changes ────────────────────────────────────────
   useEffect(() => {
-    if (activeTab === 'completed' && completedLoans.length === 0) {
-      fetchCompletedLoanData();
-    }
+    if (activeTab === 'completed' && !completedFetched) fetchCompletedLoanData();
   }, [activeTab]);
 
+  // ── Scroll handler ───────────────────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
-      const scrollableDiv = document.getElementById('scrollableDiv');
-      if (scrollableDiv) {
-        const currentScrollY = scrollableDiv.scrollTop;
-        if (currentScrollY > lastScrollY && currentScrollY > 50 && accordionOpen) {
-          setAccordionOpen(false);
-        }
-        setLastScrollY(currentScrollY);
+      const el = document.getElementById('scrollableDiv');
+      if (el) {
+        const cur = el.scrollTop;
+        if (cur > lastScrollY && cur > 50 && accordionOpen) setAccordionOpen(false);
+        setLastScrollY(cur);
       }
     };
-    const scrollableDiv = document.getElementById('scrollableDiv');
-    if (scrollableDiv) {
-      scrollableDiv.addEventListener('scroll', handleScroll);
-      return () => scrollableDiv.removeEventListener('scroll', handleScroll);
+    const el = document.getElementById('scrollableDiv');
+    if (el) {
+      el.addEventListener('scroll', handleScroll);
+      return () => el.removeEventListener('scroll', handleScroll);
     }
   }, [lastScrollY, accordionOpen]);
 
-  useEffect(() => { filterCustomers(); }, [showAllCustomers, loans]);
+  // ── Show all customers toggle ────────────────────────────────────────────────
+  useEffect(() => {
+    if (showAllCustomers) {
+      if (!allActiveFetched) fetchAllActiveLoans();
+      else {
+        setDisplayedAllActive(allActiveLoans);
+        setAllActivePagination({ displayed: Math.min(PAGE_SIZE, allActiveLoans.length), total: allActiveLoans.length });
+      }
+    }
+  }, [showAllCustomers]);
 
-  // ─── Data fetching ─────────────────────────────────────────────────────────
-  const fetchLoanData = async () => {
+  // ── Fetch loan-to-be-completed on mount ─────────────────────────────────────
+  const fetchLoanToBeCompleted = async () => {
     try {
       setLoading(true);
-      setDisburseFetched(false);
-      const response = await GET(`api/disburse_loan/`);
-      if (response?.status === 200 && response.data) {
-        // Support both paginated { count, results } and plain array responses
-        const apiData = Array.isArray(response.data)
-          ? response.data
-          : response.data.results ?? [];
-        // count === 0 is a valid empty state, not an error
-        processApiData(apiData);
+      const response = await GET('api/loan-to-be-completed/');
+      if (response?.status === 200) {
+        const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
+        setLoanToBeCompleted(raw);
+        setDisplayedLoanToBeCompleted(raw);
+        setPagination({ displayed: Math.min(PAGE_SIZE, raw.length), total: raw.length });
+        setLoanToBeCompletedFetched(true);
       } else {
-        notification.error({ message: 'Failed to fetch loan data' });
-        setLoans([]);
-        setPagination({ displayed: 0, total: 0 });
+        notification.error({ message: 'Failed to fetch loans' });
       }
-    } catch (error) {
-      console.error('Error fetching loan data:', error);
-      notification.error({ message: 'Error loading loans. Please try again.' });
-      setLoans([]);
-      setPagination({ displayed: 0, total: 0 });
+    } catch {
+      notification.error({ message: 'Error loading loans.' });
     } finally {
       setLoading(false);
-      setDisburseFetched(true);
     }
   };
 
+  // ── Fetch all active loans ───────────────────────────────────────────────────
+  const fetchAllActiveLoans = async () => {
+    try {
+      setAllActiveLoading(true);
+      const response = await GET('api/overall-active-loans/');
+      if (response?.status === 200 && response.data) {
+        const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
+        setAllActiveLoans(raw);
+        setDisplayedAllActive(raw);
+        setAllActivePagination({ displayed: Math.min(PAGE_SIZE, raw.length), total: raw.length });
+        setAllActiveFetched(true);
+      } else {
+        notification.error({ message: 'Failed to fetch active loans' });
+      }
+    } catch {
+      notification.error({ message: 'Error loading active loans.' });
+    } finally {
+      setAllActiveLoading(false);
+    }
+  };
+
+  // ── Fetch completed loans ────────────────────────────────────────────────────
   const fetchCompletedLoanData = async () => {
     try {
       setCompletedLoading(true);
-      setCompletedFetched(false);
-      const response = await GET(`api/loan-already-completed/`);
+      const response = await GET('api/loan-already-completed/');
       if (response?.status === 200 && response.data) {
-        // Support both paginated { count, results } and plain array responses
-        const apiData = Array.isArray(response.data)
-          ? response.data
-          : response.data.results ?? [];
-        // count === 0 is a valid empty state, not an error
-        processCompletedApiData(apiData);
+        const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
+        setCompletedLoans(raw);
+        setDisplayedCompleted(raw);
+        setCompletedPagination({ displayed: Math.min(PAGE_SIZE, raw.length), total: raw.length });
       } else {
-        notification.error({ message: 'Failed to fetch completed loan data' });
-        setCompletedLoans([]);
-        setCompletedPagination({ displayed: 0, total: 0 });
+        notification.error({ message: 'Failed to fetch completed loans' });
       }
-    } catch (error) {
-      console.error('Error fetching completed loan data:', error);
-      notification.error({ message: 'Error loading completed loans. Please try again.' });
-      setCompletedLoans([]);
-      setCompletedPagination({ displayed: 0, total: 0 });
+    } catch {
+      notification.error({ message: 'Error loading completed loans.' });
     } finally {
       setCompletedLoading(false);
       setCompletedFetched(true);
     }
   };
 
-  // ─── Shared grouping logic ─────────────────────────────────────────────────
-  const groupByCustomer = (apiData) => {
-    const customerMap = {};
-    apiData.forEach(loan => {
-      const custId = loan.loan_dsbrsmnt_cust_id;
-      if (!customerMap[custId]) {
-        customerMap[custId] = {
-          id: custId,
-          customerId: loan.LOAN_DSBRSMNT_CUST_CD,
-          customerName: loan.LOAN_DSBRSMNT_CUST_NM,
-          LOAN_DSBRSMNT_CUST_ID: custId,
-          LOAN_DSBRSMNT_CUST_CD: loan.LOAN_DSBRSMNT_CUST_CD,
-          LOAN_DSBRSMNT_CUST_NM: loan.LOAN_DSBRSMNT_CUST_NM,
-          LOAN_DSBRSMNT_CUST_ORDR: loan.LOAN_DSBRSMNT_CUST_ORDR,
-          LOAN_DSBRSMNT_BRNCH_NM: loan.LOAN_DSBRSMNT_BRNCH_NM,
-          LOAN_DSBRSMNT_LINE_NM: loan.LOAN_DSBRSMNT_LINE_NM,
-          LOAN_DSBRSMNT_AREA_NM: loan.LOAN_DSBRSMNT_AREA_NM,
-          branchId: loan.loan_dsbrsmnt_brnch_id,
-          lineId: loan.loan_dsbrsmnt_line_id,
-          areaId: loan.loan_dsbrsmnt_area_id,
-          loans: [],
-        };
-      }
-
-      // Normalise mode: API sends integer (1/2/3), components expect string
-      const modeString = mapLoanMode(loan.loan_dsbrsmnt_mode);
-
-      customerMap[custId].loans.push({
-        id: loan.id,
-        loan_account_number: loan.loan_account_number,
-        loan_account_code: loan.loan_account_code,
-        loan_dsbrsmnt_repmnt_type: loan.loan_dsbrsmnt_repmnt_type,
-        loan_dsbrsmnt_amnt: loan.loan_dsbrsmnt_amnt,
-        loan_dsbrsmnt_intrst_amnt: loan.loan_dsbrsmnt_intrst_amnt,
-        loan_dsbrsmnt_tot_instlmnt: loan.loan_dsbrsmnt_tot_instlmnt,
-        loan_dsbrsmnt_prcsng_fee_amnt: loan.loan_dsbrsmnt_prcsng_fee_amnt,
-        loan_dsbrsmnt_instlmnt_amnt: loan.loan_dsbrsmnt_instlmnt_amnt,
-        loan_dsbrsmnt_dflt_pay_amnt: loan.loan_dsbrsmnt_dflt_pay_amnt,
-        loan_dsbrsmnt_bad_loan_days: loan.loan_dsbrsmnt_bad_loan_days,
-        // Normalised string mode for UI consumption
-        loan_dsbrsmnt_mode: modeString,
-        // Remark field — API uses loan_dsbrsmnt_remark (not loan_dsbrsmnt_comnt)
-        loan_dsbrsmnt_comnt: loan.loan_dsbrsmnt_remark ?? loan.loan_dsbrsmnt_comnt ?? null,
-        // Cash / online split amounts (API: loan_dsbrsmnt_amnt_cash / loan_dsbrsmnt_amnt_online)
-        loan_dsbrsmnt_online_amnt: loan.loan_dsbrsmnt_amnt_online ?? loan.loan_dsbrsmnt_online_amnt ?? null,
-        loan_dsbrsmnt_cash_amnt: loan.loan_dsbrsmnt_amnt_cash ?? loan.loan_dsbrsmnt_cash_amnt ?? null,
-        loan_dsbrsmnt_online_cmt: loan.loan_dsbrsmnt_amnt_online_remark ?? loan.loan_dsbrsmnt_online_cmt ?? null,
-        loan_dsbrsmnt_cash_cmt: loan.loan_dsbrsmnt_amnt_cash_remark ?? loan.loan_dsbrsmnt_cash_cmt ?? null,
-        loan_dsbrsmnt_dt: loan.loan_dsbrsmnt_dt,
-        loan_dsbrsmnt_status: loan.loan_dsbrsmnt_status,
-        loan_dsbrsmnt_created_ts: loan.loan_dsbrsmnt_created_ts,
-        loan_dsbrsmnt_updtd_ts: loan.loan_dsbrsmnt_updtd_ts,
-        loan_dsbrsmnt_brnch_id: loan.loan_dsbrsmnt_brnch_id,
-        loan_dsbrsmnt_line_id: loan.loan_dsbrsmnt_line_id,
-        loan_dsbrsmnt_area_id: loan.loan_dsbrsmnt_area_id,
-        loan_dsbrsmnt_cust_id: loan.loan_dsbrsmnt_cust_id,
-        loan_dsbrsmnt_created_by: loan.loan_dsbrsmnt_created_by,
-        loan_dsbrsmnt_updtd_by: loan.loan_dsbrsmnt_updtd_by,
-        LOAN_DSBRSMNT_CREATED_BY_NM: loan.LOAN_DSBRSMNT_CREATED_BY_NM,
-        LOAN_DSBRSMNT_CREATED_BY_FULL_NM: loan.LOAN_DSBRSMNT_CREATED_BY_FULL_NM,
-        LOAN_DSBRSMNT_UPDTD_BY_NM: loan.LOAN_DSBRSMNT_UPDTD_BY_NM,
-        LOAN_DSBRSMNT_UPDTD_BY_FULL_NM: loan.LOAN_DSBRSMNT_UPDTD_BY_FULL_NM,
-        loanAccountNumber: loan.loan_account_number,
-        loanAmount: loan.loan_dsbrsmnt_amnt,
-      });
-    });
-    return Object.values(customerMap);
-  };
-
-  const processApiData = (apiData) => {
-    const customersArray = groupByCustomer(apiData);
-    setLoans(customersArray);
-    setPagination({ displayed: Math.min(PAGE_SIZE, customersArray.length), total: customersArray.length });
-  };
-
-  const processCompletedApiData = (apiData) => {
-    // Completed API returns a flat list — each item is already one customer summary.
-    // Shape: { customer_order_no, customer_name, customer_id, loan_account_numbers[], total_active_loans }
-    // Normalise to a consistent object so the render function can rely on stable keys.
-    const normalised = apiData.map((item, idx) => ({
-      // Use customer_id as the unique React key; fall back to index
-      id: item.customer_id ?? `completed-${idx}`,
-      customer_id: item.customer_id,
-      customer_name: item.customer_name,
-      customer_order_no: item.customer_order_no,
-      loan_account_numbers: item.loan_account_numbers ?? [],
-      total_active_loans: item.total_active_loans ?? (item.loan_account_numbers?.length ?? 0),
-    }));
-    setCompletedLoans(normalised);
-    setDisplayedCompletedLoans(normalised);
-    setCompletedPagination({ displayed: Math.min(PAGE_SIZE, normalised.length), total: normalised.length });
-  };
-
-  const filterCustomers = () => {
-    let filtered = [...loans];
-    if (!showAllCustomers) {
-      filtered = filtered.filter(customer => customer.loans && customer.loans.length > 0);
-    }
-    setDisplayedLoans(filtered);
-    setPagination({ displayed: Math.min(PAGE_SIZE, filtered.length), total: filtered.length });
-  };
-
-  const loadMoreCustomers = () => {
-    setPagination(prev => ({ ...prev, displayed: Math.min(prev.displayed + PAGE_SIZE, prev.total) }));
-  };
-
-  const loadMoreCompletedCustomers = () => {
-    setCompletedPagination(prev => ({ ...prev, displayed: Math.min(prev.displayed + PAGE_SIZE, prev.total) }));
-  };
-
-  // ─── Handlers ──────────────────────────────────────────────────────────────
-  const handleLineChange = async (lineId) => {
-    setSelectedLineId(lineId);
-    searchForm.setFieldsValue({ areaIds: [] });
-    if (!lineId) { setFilteredAreaList([]); return; }
+  // ── Fetch ALL disburse loans (once, paginated) and build map by loan id ──────
+  const fetchAllDisburseLoans = async () => {
+    if (disburseLoanFetched) return disburseLoanMap;
     try {
-      setAreaLoading(true);
-      const response = await GET(`api/area_dd?line_id=${lineId}`);
-      if (response?.status === 200) { setFilteredAreaList(response.data); }
-      else { notification.error({ message: "Failed to fetch areas" }); setFilteredAreaList([]); }
-    } catch (error) {
-      console.error("Error:", error); setFilteredAreaList([]);
-    } finally { setAreaLoading(false); }
-  };
-
-  const getLastNonZeroDigits = (accountNumber, n = 6) => {
-    if (!accountNumber) return '';
-    const lastNDigits = String(accountNumber).slice(-n);
-    const withoutLeadingZeros = lastNDigits.replace(/^0+/, '');
-    return withoutLeadingZeros || '0';
-  };
-
-  const getMaskedAccountNumber = (accountNumber) => {
-    if (!accountNumber) return '';
-    const str = String(accountNumber);
-    const lastFive = str.slice(-5);
-    const visibleSuffix = lastFive.replace(/^0+/, '') || lastFive.slice(-1);
-    const maskCount = str.length - visibleSuffix.length;
-    return 'x'.repeat(maskCount) + visibleSuffix;
-  };
-
-  const handleAddLoan = (customer) => {
-    const customerId = customer.LOAN_DSBRSMNT_CUST_ID || customer.id;
-    const customerCode = customer.LOAN_DSBRSMNT_CUST_CD || customer.customerId;
-    const customerName = customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM;
-    notification.info({ message: 'Add New Loan', description: `Opening loan disbursement form for ${customerName}` });
-    navigate(`/new-loan-disbursement/add`, {
-      state: { mode: 'add', customerId, customerCode, customerName, branchId: customer.branchId, lineId: customer.lineId, areaId: customer.areaId }
-    });
-  };
-
-  const handleSwipeStateChange = (customerId, isOpen) => {
-    if (isOpen) { setOpenSwipeId(customerId); }
-    else if (openSwipeId === customerId) { setOpenSwipeId(null); }
-  };
-
-  const handleCompletedSwipeStateChange = (customerId, isOpen) => {
-    if (isOpen) { setOpenCompletedSwipeId(customerId); }
-    else if (openCompletedSwipeId === customerId) { setOpenCompletedSwipeId(null); }
-  };
-
-  const handleExpandToggle = (customer) => {
-    setExpandedCustomers(prev => {
-      if (prev[customer.id]) return { ...prev, [customer.id]: false };
-      setAccordionOpen(false);
-      if (isMobile) {
-        setTimeout(() => {
-          const scrollContainer = document.getElementById('scrollableDiv');
-          const element = document.querySelector(`[data-customer-id="${customer.id}"]`);
-          if (scrollContainer && element) {
-            const containerRect = scrollContainer.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            scrollContainer.scrollTo({ top: elementRect.top - containerRect.top + scrollContainer.scrollTop, behavior: 'smooth' });
-          }
-        }, 350);
+      setExpandLoading(true);
+      let allDisbursed = [];
+      let nextUrl = 'api/disburse_loan/';
+      while (nextUrl) {
+        const dr = await GET(nextUrl);
+        if (dr?.status === 200) {
+          const page = Array.isArray(dr.data) ? dr.data : dr.data?.results ?? [];
+          allDisbursed = [...allDisbursed, ...page];
+          nextUrl = dr.data?.next ? dr.data.next.replace(/^https?:\/\/[^/]+\//, '') : null;
+        } else {
+          nextUrl = null;
+        }
       }
-      return { [customer.id]: true };
-    });
+      // Build map keyed by loan id (string) for direct lookup by loan_disbursement_id
+      const dMap = {};
+      allDisbursed.forEach(loan => {
+        const lid = String(loan.id);
+        dMap[lid] = {
+          ...loan,
+          loan_dsbrsmnt_mode: mapLoanMode(loan.loan_dsbrsmnt_mode),
+          loan_dsbrsmnt_comnt: loan.loan_dsbrsmnt_remark ?? loan.loan_dsbrsmnt_comnt ?? null,
+          loan_dsbrsmnt_online_amnt: loan.loan_dsbrsmnt_amnt_online ?? loan.loan_dsbrsmnt_online_amnt ?? null,
+          loan_dsbrsmnt_cash_amnt: loan.loan_dsbrsmnt_amnt_cash ?? loan.loan_dsbrsmnt_cash_amnt ?? null,
+          loan_dsbrsmnt_online_cmt: loan.loan_dsbrsmnt_amnt_online_remark ?? loan.loan_dsbrsmnt_online_cmt ?? null,
+          loan_dsbrsmnt_cash_cmt: loan.loan_dsbrsmnt_amnt_cash_remark ?? loan.loan_dsbrsmnt_cash_cmt ?? null,
+        };
+      });
+      setDisburseLoanMap(dMap);
+      setDisburseLoanFetched(true);
+      return dMap;
+    } catch {
+      notification.error({ message: 'Error loading loan details.' });
+      return disburseLoanMap;
+    } finally {
+      setExpandLoading(false);
+    }
+  };
+
+  // ── Get detail loans for a customer using loan_disbursement_id list ──────────
+  // Works for both loan-to-be-completed and overall-active-loans
+  // Both have loans[].loan_disbursement_id
+  const getDetailLoansForCustomer = (customer, map) => {
+    const loanIds = (customer.loans ?? []).map(l => String(l.loan_disbursement_id));
+    return loanIds.map(id => map[id]).filter(Boolean);
+  };
+
+  // ── Pagination helpers ───────────────────────────────────────────────────────
+  const loadMoreLoanToBeCompleted = () => setPagination(p => ({ ...p, displayed: Math.min(p.displayed + PAGE_SIZE, p.total) }));
+  const loadMoreAllActive = () => setAllActivePagination(p => ({ ...p, displayed: Math.min(p.displayed + PAGE_SIZE, p.total) }));
+  const loadMoreCompleted = () => setCompletedPagination(p => ({ ...p, displayed: Math.min(p.displayed + PAGE_SIZE, p.total) }));
+
+  // ── Expand/collapse handler ──────────────────────────────────────────────────
+  const handleExpandToggle = async (customer) => {
+    const cid = String(customer.customer_id);
+    if (String(expandedCustomerId) === cid) {
+      setExpandedCustomerId(null);
+      return;
+    }
+    setExpandedCustomerId(cid);
+    setAccordionOpen(false);
+    await fetchAllDisburseLoans();
+    if (isMobile) {
+      setTimeout(() => {
+        const sc = document.getElementById('scrollableDiv');
+        const el = document.querySelector(`[data-customer-id="${cid}"]`);
+        if (sc && el) sc.scrollTo({ top: el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop, behavior: 'smooth' });
+      }, 350);
+    }
   };
 
   const handleCompletedExpandToggle = (customer) => {
-    setExpandedCompletedCustomers(prev => {
-      if (prev[customer.id]) return { ...prev, [customer.id]: false };
-      setAccordionOpen(false);
-      if (isMobile) {
-        setTimeout(() => {
-          const scrollContainer = document.getElementById('completedScrollableDiv');
-          const element = document.querySelector(`[data-completed-customer-id="${customer.id}"]`);
-          if (scrollContainer && element) {
-            const containerRect = scrollContainer.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            scrollContainer.scrollTo({ top: elementRect.top - containerRect.top + scrollContainer.scrollTop, behavior: 'smooth' });
-          }
-        }, 350);
-      }
-      return { [customer.id]: true };
+    const cid = String(customer.customer_id ?? customer.id);
+    setExpandedCompletedCustomerId(prev => String(prev) === cid ? null : cid);
+    setAccordionOpen(false);
+  };
+
+  // ── Add loan handler ─────────────────────────────────────────────────────────
+  const handleAddLoan = (customer) => {
+    navigate('/new-loan-disbursement/add', {
+      state: {
+        mode: 'add',
+        customerCode: customer.customer_id,
+        customerName: customer.customer_name,
+      },
     });
   };
 
-  const handleMenuClick = (action, customer) => {
-    if (action === 'Edit') { handleEditCustomer(customer); }
-    else if (action === 'View') { handleExpandToggle(customer); }
-    else { notification.info({ message: action, description: `Action ${action} for ${customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM}` }); }
-  };
-
-  const handleEditCustomer = (customer) => {
-    const customerId = customer.LOAN_DSBRSMNT_CUST_ID || customer.id;
-    const customerName = customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM;
-    const loans = customer.loans || [];
-    if (loans.length === 0) { notification.warning({ message: 'No Loans to Edit', description: `${customerName} has no active loans.` }); return; }
+  // ── Edit loan handler ────────────────────────────────────────────────────────
+  const handleEditCustomer = async (customer) => {
+    const customerName = customer.customer_name ?? 'N/A';
+    const map = await fetchAllDisburseLoans();
+    const loans = getDetailLoansForCustomer(customer, map);
+    if (loans.length === 0) {
+      notification.warning({ message: 'No Loans to Edit', description: `${customerName} has no active loans.` });
+      return;
+    }
     if (loans.length === 1) {
       const loan = loans[0];
-      notification.info({ message: 'Edit Loan', description: `Opening edit form for ${customerName}` });
       navigate(`/new-loan-disbursement/${loan.id}`, {
-        state: { mode: 'edit', customerId, customerName, loanData: loan, branchId: loan.loan_dsbrsmnt_brnch_id, lineId: loan.loan_dsbrsmnt_line_id, areaId: loan.loan_dsbrsmnt_area_id }
+        state: { mode: 'edit', customerName, loanData: loan },
       });
       return;
     }
-    setSelectedCustomerForEdit(customer);
+    setSelectedCustomerForEdit({ ...customer, resolvedLoans: loans });
     setLoanSelectionModalVisible(true);
     loanSelectionForm.resetFields();
   };
 
   const handleLoanSelectionOk = () => {
     loanSelectionForm.validateFields().then((values) => {
-      const customer = selectedCustomerForEdit;
-      const customerId = customer.LOAN_DSBRSMNT_CUST_ID || customer.id;
-      const customerName = customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM;
-      const selectedLoan = customer.loans?.find(l => String(l.id) === String(values.loanSelection));
+      const c = selectedCustomerForEdit;
+      const selectedLoan = c.resolvedLoans?.find(l => String(l.id) === String(values.loanSelection));
       if (selectedLoan) {
         navigate(`/new-loan-disbursement/${selectedLoan.id}`, {
-          state: { mode: 'edit', customerId, customerName, loanData: selectedLoan, branchId: selectedLoan.loan_dsbrsmnt_brnch_id, lineId: selectedLoan.loan_dsbrsmnt_line_id, areaId: selectedLoan.loan_dsbrsmnt_area_id }
+          state: { mode: 'edit', customerName: c.customer_name, loanData: selectedLoan },
         });
         setLoanSelectionModalVisible(false);
         loanSelectionForm.resetFields();
         setSelectedCustomerForEdit(null);
       }
-    }).catch(info => console.log('Validation Failed:', info));
+    }).catch(console.log);
   };
 
   const handleLoanSelectionCancel = () => {
@@ -468,89 +324,290 @@ const LoanDisbursementList = () => {
     setSelectedCustomerForEdit(null);
   };
 
+  // ── Delete handler ───────────────────────────────────────────────────────────
   const onDelete = async (customer) => {
     try {
-      const customerName = customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM;
-      setLoans(loans.filter(c => c.id !== customer.id));
-      notification.success({ message: 'Loan Deleted', description: `Loan for ${customerName} has been removed successfully.`, duration: 5 });
-    } catch (error) {
-      notification.error({ message: 'Delete Failed', description: 'Failed to delete the loan. Please try again.', duration: 5 });
+      const name = customer.customer_name ?? 'N/A';
+      setLoanToBeCompleted(p => p.filter(c => c.customer_id !== customer.customer_id));
+      setDisplayedLoanToBeCompleted(p => p.filter(c => c.customer_id !== customer.customer_id));
+      if (expandedCustomerId === String(customer.customer_id)) setExpandedCustomerId(null);
+      notification.success({ message: 'Loan Deleted', description: `Loan for ${name} removed.`, duration: 5 });
+    } catch {
+      notification.error({ message: 'Delete Failed', duration: 5 });
     }
   };
 
-  // ─── Menus ─────────────────────────────────────────────────────────────────
+  // ── Menus ────────────────────────────────────────────────────────────────────
   const renderCustomerMenu = (customer) => (
     <Menu>
-      <Menu.Item key="view" onClick={() => handleMenuClick('View', customer)}>
-        <div className="d-flex align-items-center gap-1">
-          <span className="mdi mdi-eye text-secondary"></span><span>View Details</span>
-        </div>
+      <Menu.Item key="view" onClick={() => handleExpandToggle(customer)}>
+        <div className="d-flex align-items-center gap-1"><span className="mdi mdi-eye text-secondary" /><span>View Details</span></div>
       </Menu.Item>
-      <Menu.Item key="edit" onClick={() => handleMenuClick('Edit', customer)}>
-        <div className="d-flex align-items-center gap-1">
-          <span className="mdi mdi-pencil text-secondary"></span><span>Edit</span>
-        </div>
+      <Menu.Item key="edit" onClick={() => handleEditCustomer(customer)}>
+        <div className="d-flex align-items-center gap-1"><span className="mdi mdi-pencil text-secondary" /><span>Edit</span></div>
       </Menu.Item>
       <Menu.Item key="delete">
         <Popconfirm
-          title={`Delete loan for ${customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM}?`}
+          title={`Delete loan for ${customer.customer_name}?`}
           description="Are you sure you want to delete this loan permanently?"
-          icon={<ExclamationCircleOutlined style={{ color: "red" }} />}
-          onConfirm={(e) => { e.stopPropagation(); onDelete(customer); }}
-          okText="Delete" cancelText="Cancel"
-          okButtonProps={{ danger: true, type: "primary" }}
+          icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+          onConfirm={(e) => { e?.stopPropagation(); onDelete(customer); }}
+          okText="Delete" cancelText="Cancel" okButtonProps={{ danger: true, type: 'primary' }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="d-flex align-items-center gap-1" style={{ color: "red" }}>
-            <DeleteFilled style={{ color: "red" }} /><span>Delete</span>
+          <div className="d-flex align-items-center gap-1" style={{ color: 'red' }}>
+            <DeleteFilled style={{ color: 'red' }} /><span>Delete</span>
           </div>
         </Popconfirm>
       </Menu.Item>
     </Menu>
   );
 
-  // View-only menu for completed loans (no edit/delete)
   const renderCompletedCustomerMenu = (customer) => (
     <Menu>
       <Menu.Item key="view" onClick={() => handleCompletedExpandToggle(customer)}>
-        <div className="d-flex align-items-center gap-1">
-          <span className="mdi mdi-eye text-secondary"></span><span>View Details</span>
-        </div>
+        <div className="d-flex align-items-center gap-1"><span className="mdi mdi-eye text-secondary" /><span>View Details</span></div>
       </Menu.Item>
     </Menu>
   );
 
-  // ─── Render: DISBURSE item ─────────────────────────────────────────────────
-  const renderLoanItem = (customer, index) => {
-    const hasLoans = customer.loans && customer.loans.length > 0;
-    const loanCount = customer.loans?.length || 0;
-    const firstLoan = customer.loans?.[0] || null;
-    const accountSuffix = firstLoan ? getLastNonZeroDigits(firstLoan.loan_account_number, 6) : '';
+  // ── Loan detail cards (expanded view) ────────────────────────────────────────
+  const renderLoanDetailCards = (detailLoans, pendingInstallmentsMap = {}) => {
+    if (!detailLoans || detailLoans.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#8c8c8c' }}>
+          {expandLoading
+            ? <Spin tip="Loading loan details..." />
+            : <Text type="secondary">No loan details available</Text>
+          }
+        </div>
+      );
+    }
+
+    return detailLoans.map((loan, idx) => (
+      <Card
+        key={idx}
+        size="small"
+        style={{ marginBottom: idx < detailLoans.length - 1 ? '12px' : 0, borderRadius: '8px', border: '1px solid #e8e8e8' }}
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+            <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 600 }}>
+              {loan.loan_account_number}
+            </span>
+            <Space size={4}>
+              {pendingInstallmentsMap[loan.loan_account_number] != null && (
+                <Tag color="orange" style={{ fontSize: '11px' }}>
+                  {pendingInstallmentsMap[loan.loan_account_number]} EMI pending
+                </Tag>
+              )}
+              <Tag color={loan.loan_dsbrsmnt_mode === 'Online' ? 'cyan' : loan.loan_dsbrsmnt_mode === 'Cash' ? 'gold' : loan.loan_dsbrsmnt_mode === 'Both' ? 'purple' : 'default'}>
+                {loan.loan_dsbrsmnt_mode}
+              </Tag>
+              <Tag color={loan.loan_dsbrsmnt_status === 'Active' ? 'green' : 'red'}>
+                {loan.loan_dsbrsmnt_status}
+              </Tag>
+            </Space>
+          </div>
+        }
+      >
+        <Row gutter={[12, 10]}>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Loan Amount</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+              ₹{parseFloat(loan.loan_dsbrsmnt_amnt || 0).toLocaleString('en-IN')}
+            </div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Interest Amount</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+              ₹{parseFloat(loan.loan_dsbrsmnt_intrst_amnt || 0).toLocaleString('en-IN')}
+            </div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Installment Amount</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+              ₹{parseFloat(loan.loan_dsbrsmnt_instlmnt_amnt || 0).toLocaleString('en-IN')}
+            </div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Total Installments</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>{loan.loan_dsbrsmnt_tot_instlmnt || '-'}</div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Processing Fee</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+              ₹{parseFloat(loan.loan_dsbrsmnt_prcsng_fee_amnt || 0).toLocaleString('en-IN')}
+            </div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Default Pay Amount</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+              ₹{parseFloat(loan.loan_dsbrsmnt_dflt_pay_amnt || 0).toLocaleString('en-IN')}
+            </div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Repayment Type</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>{loan.loan_dsbrsmnt_repmnt_type || '-'}</div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Bad Loan Days</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: loan.loan_dsbrsmnt_bad_loan_days > 0 ? '#ff4d4f' : '#262626' }}>
+              {loan.loan_dsbrsmnt_bad_loan_days ?? '-'}
+            </div>
+          </Col>
+          <Col xs={12} sm={8}>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Disbursement Date</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+              {loan.loan_dsbrsmnt_dt ? new Date(loan.loan_dsbrsmnt_dt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+            </div>
+          </Col>
+          {loan.LOAN_DSBRSMNT_BRNCH_NM && (
+            <Col xs={12} sm={8}>
+              <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Branch</div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: '#595959' }}>{loan.LOAN_DSBRSMNT_BRNCH_NM}</div>
+            </Col>
+          )}
+          {loan.LOAN_DSBRSMNT_LINE_NM && (
+            <Col xs={12} sm={8}>
+              <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Line</div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: '#595959' }}>{loan.LOAN_DSBRSMNT_LINE_NM}</div>
+            </Col>
+          )}
+          {loan.LOAN_DSBRSMNT_AREA_NM && (
+            <Col xs={12} sm={8}>
+              <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Area</div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: '#595959' }}>{loan.LOAN_DSBRSMNT_AREA_NM}</div>
+            </Col>
+          )}
+          {loan.loan_dsbrsmnt_mode === 'Both' && (
+            <>
+              <Col xs={12} sm={8}>
+                <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Cash Amount</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+                  ₹{parseFloat(loan.loan_dsbrsmnt_cash_amnt || 0).toLocaleString('en-IN')}
+                </div>
+              </Col>
+              <Col xs={12} sm={8}>
+                <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Online Amount</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+                  ₹{parseFloat(loan.loan_dsbrsmnt_online_amnt || 0).toLocaleString('en-IN')}
+                </div>
+              </Col>
+              {loan.loan_dsbrsmnt_cash_cmt && (
+                <Col xs={24} sm={12}>
+                  <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Cash Remark</div>
+                  <div style={{ fontSize: '13px', color: '#595959' }}>{loan.loan_dsbrsmnt_cash_cmt}</div>
+                </Col>
+              )}
+              {loan.loan_dsbrsmnt_online_cmt && (
+                <Col xs={24} sm={12}>
+                  <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Online Remark</div>
+                  <div style={{ fontSize: '13px', color: '#595959' }}>{loan.loan_dsbrsmnt_online_cmt}</div>
+                </Col>
+              )}
+            </>
+          )}
+          {loan.loan_dsbrsmnt_comnt && (
+            <Col xs={24}>
+              <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Remark</div>
+              <div style={{ fontSize: '13px', color: '#595959', fontStyle: 'italic' }}>{loan.loan_dsbrsmnt_comnt}</div>
+            </Col>
+          )}
+          <Col xs={24}>
+            <Divider style={{ margin: '8px 0' }} />
+            <Row gutter={[12, 4]}>
+              {loan.LOAN_DSBRSMNT_CREATED_BY_NM && (
+                <Col xs={12}>
+                  <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Created By</div>
+                  <div style={{ fontSize: '12px', color: '#595959' }}>
+                    {loan.LOAN_DSBRSMNT_CREATED_BY_FULL_NM || loan.LOAN_DSBRSMNT_CREATED_BY_NM}
+                    {loan.loan_dsbrsmnt_created_ts && (
+                      <span style={{ color: '#bfbfbf', marginLeft: '4px' }}>
+                        · {new Date(loan.loan_dsbrsmnt_created_ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                </Col>
+              )}
+              {loan.LOAN_DSBRSMNT_UPDTD_BY_NM && (
+                <Col xs={12}>
+                  <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '2px' }}>Updated By</div>
+                  <div style={{ fontSize: '12px', color: '#595959' }}>
+                    {loan.LOAN_DSBRSMNT_UPDTD_BY_FULL_NM || loan.LOAN_DSBRSMNT_UPDTD_BY_NM}
+                    {loan.loan_dsbrsmnt_updtd_ts && (
+                      <span style={{ color: '#bfbfbf', marginLeft: '4px' }}>
+                        · {new Date(loan.loan_dsbrsmnt_updtd_ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                </Col>
+              )}
+            </Row>
+          </Col>
+        </Row>
+      </Card>
+    ));
+  };
+
+  // ── Render: loan-to-be-completed list item ───────────────────────────────────
+  const renderLoanToBeCompletedItem = (customer, index) => {
+    const cid = String(customer.customer_id);
+    const isExpanded = String(expandedCustomerId) === cid;
+    const loanCount = customer.total_active_loans ?? 0;
+    const customerName = customer.customer_name ?? 'N/A';
+    const firstAcc = customer.loans?.[0]?.loan_account_number ?? '';
+    const accountSuffix = firstAcc ? getLastNonZeroDigits(firstAcc, 6) : '';
+
+    // pending_installments map: loan_account_number -> count
+    const pendingInstallmentsMap = {};
+    (customer.loans ?? []).forEach(l => {
+      if (l.loan_account_number && l.pending_installments != null) {
+        pendingInstallmentsMap[l.loan_account_number] = l.pending_installments;
+      }
+    });
+
+    const totalPendingEmi = (customer.loans ?? []).reduce((sum, l) => sum + (l.pending_installments ?? 0), 0);
+
+    // Match by loan_disbursement_id -> disburse loan id
+    const detailLoans = getDetailLoansForCustomer(customer, disburseLoanMap);
 
     if (isMobile) {
-      const isExpanded = expandedCustomers[customer.id];
       return (
-        <div key={customer.id} className="loan-mobile-item-wrapper" style={{ marginBottom: '12px' }} data-customer-id={customer.id}>
+        <div key={cid} className="loan-mobile-item-wrapper" style={{ marginBottom: '12px' }} data-customer-id={cid}>
           <div style={{ position: 'relative' }}>
             <SwipeablePanel
-              item={{ ...customer, lineIndex: index + 1, displayTitle: `${accountSuffix ? accountSuffix + ' - ' : ''}${customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM}` }}
-              titleKey="displayTitle" name="loan"
+              item={{ ...customer, lineIndex: index + 1, displayTitle: `${accountSuffix ? accountSuffix + ' - ' : ''}${customerName}` }}
+              titleKey="displayTitle"
+              name="loan"
               onSwipeRight={!isExpanded ? () => handleEditCustomer(customer) : undefined}
               onSwipeLeft={!isExpanded ? () => onDelete(customer) : undefined}
-              isSwipeOpen={openSwipeId === customer.id}
-              onSwipeStateChange={(isOpen) => handleSwipeStateChange(customer.id, isOpen)}
-              isExpanded={isExpanded} onExpandToggle={() => handleExpandToggle(customer)} disableAutoScroll={true}
-              renderContent={() => <LoanCollapseContent customer={customer} loans={customer.loans || []} />}
+              isSwipeOpen={openSwipeId === cid}
+              onSwipeStateChange={(isOpen) => {
+                if (isOpen) setOpenSwipeId(cid);
+                else if (openSwipeId === cid) setOpenSwipeId(null);
+              }}
+              isExpanded={isExpanded}
+              onExpandToggle={() => handleExpandToggle(customer)}
+              disableAutoScroll={true}
+              renderContent={() => (
+                <div style={{ padding: '12px' }}>
+                  {expandLoading && detailLoans.length === 0
+                    ? <div style={{ textAlign: 'center', padding: '20px' }}><Spin tip="Loading..." /></div>
+                    : renderLoanDetailCards(detailLoans, pendingInstallmentsMap)
+                  }
+                </div>
+              )}
             />
-            {!isExpanded && openSwipeId !== customer.id && (
+            {!isExpanded && openSwipeId !== cid && (
               <div style={{ position: 'absolute', right: '5px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {loanCount < 2 && (
-                  <Button type="primary" shape="circle" icon={<PlusOutlined />} size="small"
+                  <Button
+                    type="primary" shape="circle" icon={<PlusOutlined />} size="small"
                     onClick={(e) => { e.stopPropagation(); handleAddLoan(customer); }}
-                    className="loan-add-button" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)', backgroundColor: '#28a745', borderColor: '#28a745' }}
+                    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)', backgroundColor: '#28a745', borderColor: '#28a745' }}
                   />
                 )}
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', padding: 0, border: '1px solid #d9d9d9', borderRadius: '17.5px', backgroundColor: '#fff', color: 'rgba(0,0,0,0.88)', fontWeight: '600', fontSize: '20px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '5px' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', border: '1px solid #d9d9d9', borderRadius: '17.5px', backgroundColor: '#fff', fontWeight: '600', fontSize: '20px', marginRight: '5px' }}>
                   {loanCount}
                 </div>
               </div>
@@ -561,33 +618,47 @@ const LoanDisbursementList = () => {
     }
 
     return (
-      <div key={customer.id} className="loan-customer-list-item-wrapper">
-        <List.Item className={expandedCustomers[customer.id] ? "loan-customer-list-item loan-list-item-expanded" : "loan-customer-list-item"}>
+      <div key={cid} className="loan-customer-list-item-wrapper">
+        <List.Item
+          className={isExpanded ? 'loan-customer-list-item loan-list-item-expanded' : 'loan-customer-list-item'}
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleExpandToggle(customer)}
+        >
           <List.Item.Meta
             avatar={<div className="loan-customer-index-badge">{index + 1}</div>}
             title={
               <div className="loan-customer-title-container">
-                <div onClick={() => handleExpandToggle(customer)} style={{ flex: 1, cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                      <span className="loan-customer-name">{accountSuffix ? `${accountSuffix} - ` : ''}{customer.customerName || customer.LOAN_DSBRSMNT_CUST_NM}</span>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #d9d9d9', borderRadius: '19px', backgroundColor: '#fff', fontWeight: '600', fontSize: '22px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '20px' }}>{loanCount}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span className="loan-customer-name">
+                      {accountSuffix ? `${accountSuffix} - ` : ''}{customerName}
+                      {totalPendingEmi > 0 && (
+                        <Tag color="orange" style={{ marginLeft: '8px', fontSize: '11px' }}>
+                          {totalPendingEmi} EMI pending
+                        </Tag>
+                      )}
+                    </span>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #d9d9d9', borderRadius: '19px', backgroundColor: '#fff', fontWeight: '600', fontSize: '22px', marginRight: '20px' }}>
+                      {loanCount}
                     </div>
-                    {hasLoans ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                        {customer.loans.map((loan, idx) => (
-                          <div key={idx} style={{ fontSize: '13px', color: '#595959', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>{idx + 1}. {loan.loanAccountNumber || loan.loan_account_number} - ₹{parseFloat(loan.loanAmount || loan.loan_dsbrsmnt_amnt).toLocaleString()}</span>
-                            <Tag color={loan.loan_dsbrsmnt_mode === 'Online' ? 'cyan' : loan.loan_dsbrsmnt_mode === 'Cash' ? 'gold' : loan.loan_dsbrsmnt_mode === 'Both' ? 'purple' : 'default'} style={{ fontSize: '11px' }}>{loan.loan_dsbrsmnt_mode}</Tag>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (<Tag color="orange" style={{ width: 'fit-content' }}>No active loans</Tag>)}
                   </div>
+                  {customer.loans?.length > 0 && (
+                    <div style={{ marginTop: '4px' }}>
+                      {customer.loans.map(l => (
+                        <Tag key={l.loan_account_number} style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                          {getLastNonZeroDigits(l.loan_account_number, 8)}
+                          {l.pending_installments != null && (
+                            <span style={{ color: '#fa8c16', marginLeft: '4px' }}>·{l.pending_installments}</span>
+                          )}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="loan-customer-actions">
+                <div className="loan-customer-actions" onClick={(e) => e.stopPropagation()}>
                   {loanCount < 2 && (
-                    <Button type="primary" shape="circle" icon={<PlusOutlined />} size="small" className="loan-add-button"
+                    <Button
+                      type="primary" shape="circle" icon={<PlusOutlined />} size="small"
                       onClick={(e) => { e.stopPropagation(); handleAddLoan(customer); }}
                       style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}
                     />
@@ -600,43 +671,67 @@ const LoanDisbursementList = () => {
             }
           />
         </List.Item>
-        {expandedCustomers[customer.id] && (
-          <div className="loan-collapse-content" style={{ padding: '16px', background: '#fafafa' }}>
-            <LoanCollapseContent customer={customer} loans={customer.loans || []} />
+        {isExpanded && (
+          <div className="loan-collapse-content" style={{ padding: '16px', background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
+            {expandLoading && detailLoans.length === 0
+              ? <div style={{ textAlign: 'center', padding: '20px' }}><Spin tip="Loading loan details..." /></div>
+              : renderLoanDetailCards(detailLoans, pendingInstallmentsMap)
+            }
           </div>
         )}
       </div>
     );
   };
 
-  // ─── Render: COMPLETED item ────────────────────────────────────────────────
-  const renderCompletedLoanItem = (customer, index) => {
-    // Completed API shape: { id, customer_id, customer_name, customer_order_no,
-    //                        loan_account_numbers[], total_active_loans }
-    const loanCount    = customer.total_active_loans ?? customer.loan_account_numbers?.length ?? 0;
-    const customerName = customer.customer_name ?? "N/A";
-    const firstAcc     = customer.loan_account_numbers?.[0];
-    // Show the meaningful suffix of the first account number as a label prefix
-    const accountSuffix = firstAcc
-      ? String(firstAcc).slice(-6).replace(/^0+/, '') || String(firstAcc).slice(-1)
-      : '';
+  // ── Render: all active list item — NO 3-dot, YES + icon ─────────────────────
+  const renderAllActiveItem = (customer, index) => {
+    const cid = String(customer.customer_id ?? customer.id);
+    const isExpanded = String(expandedCustomerId) === cid;
+    const loanCount = customer.total_active_loans ?? customer.loans?.length ?? 0;
+    const customerName = customer.customer_name ?? 'N/A';
+    const firstAcc = customer.loans?.[0]?.loan_account_number ?? '';
+    const accountSuffix = firstAcc ? getLastNonZeroDigits(firstAcc, 6) : '';
+
+    // Match by loan_disbursement_id from overall-active-loans loans[]
+    const detailLoans = getDetailLoansForCustomer(customer, disburseLoanMap);
 
     if (isMobile) {
-      const isExpanded = expandedCompletedCustomers[customer.id];
       return (
-        <div key={customer.id} className="loan-mobile-item-wrapper" style={{ marginBottom: '12px' }} data-completed-customer-id={customer.id}>
+        <div key={cid} className="loan-mobile-item-wrapper" style={{ marginBottom: '12px' }} data-customer-id={cid}>
           <div style={{ position: 'relative' }}>
             <SwipeablePanel
               item={{ ...customer, lineIndex: index + 1, displayTitle: `${accountSuffix ? accountSuffix + ' - ' : ''}${customerName}` }}
-              titleKey="displayTitle" name="completed-loan"
-              isSwipeOpen={openCompletedSwipeId === customer.id}
-              onSwipeStateChange={(isOpen) => handleCompletedSwipeStateChange(customer.id, isOpen)}
-              isExpanded={isExpanded} onExpandToggle={() => handleCompletedExpandToggle(customer)} disableAutoScroll={true}
-              renderContent={() => <CompletedLoanCollapseContent customer={customer} />}
+              titleKey="displayTitle"
+              name="loan-active"
+              isSwipeOpen={openSwipeId === cid}
+              onSwipeStateChange={(isOpen) => {
+                if (isOpen) setOpenSwipeId(cid);
+                else if (openSwipeId === cid) setOpenSwipeId(null);
+              }}
+              isExpanded={isExpanded}
+              onExpandToggle={() => handleExpandToggle(customer)}
+              disableAutoScroll={true}
+              renderContent={() => (
+                <div style={{ padding: '12px' }}>
+                  {expandLoading && detailLoans.length === 0
+                    ? <div style={{ textAlign: 'center', padding: '20px' }}><Spin tip="Loading..." /></div>
+                    : renderLoanDetailCards(detailLoans)
+                  }
+                </div>
+              )}
             />
-            {!isExpanded && openCompletedSwipeId !== customer.id && (
+            {!isExpanded && openSwipeId !== cid && (
               <div style={{ position: 'absolute', right: '5px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', padding: 0, border: '1px solid #b7eb8f', borderRadius: '17.5px', backgroundColor: '#f6ffed', color: '#52c41a', fontWeight: '600', fontSize: '20px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '5px' }}>{loanCount}</div>
+                {loanCount < 2 && (
+                  <Button
+                    type="primary" shape="circle" icon={<PlusOutlined />} size="small"
+                    onClick={(e) => { e.stopPropagation(); handleAddLoan(customer); }}
+                    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)', backgroundColor: '#28a745', borderColor: '#28a745' }}
+                  />
+                )}
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', border: '1px solid #d9d9d9', borderRadius: '17.5px', backgroundColor: '#fff', fontWeight: '600', fontSize: '20px', marginRight: '5px' }}>
+                  {loanCount}
+                </div>
               </div>
             )}
           </div>
@@ -644,36 +739,121 @@ const LoanDisbursementList = () => {
       );
     }
 
-    // Desktop
     return (
-      <div key={customer.id} className="loan-customer-list-item-wrapper">
-        <List.Item className={expandedCompletedCustomers[customer.id] ? "loan-customer-list-item loan-list-item-expanded" : "loan-customer-list-item"}>
+      <div key={cid} className="loan-customer-list-item-wrapper">
+        <List.Item
+          className={isExpanded ? 'loan-customer-list-item loan-list-item-expanded' : 'loan-customer-list-item'}
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleExpandToggle(customer)}
+        >
           <List.Item.Meta
             avatar={<div className="loan-customer-index-badge">{index + 1}</div>}
             title={
               <div className="loan-customer-title-container">
-                <div onClick={() => handleCompletedExpandToggle(customer)} style={{ flex: 1, cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {/* Name row + count badge */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                      <span className="loan-customer-name">
-                        {accountSuffix ? `${accountSuffix} - ` : ''}{customerName}
-                      </span>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #b7eb8f', borderRadius: '19px', backgroundColor: '#f6ffed', color: '#52c41a', fontWeight: '600', fontSize: '22px', boxShadow: '0 2px 0 rgba(0,0,0,0.02)', marginRight: '20px' }}>{loanCount}</div>
-                    </div>
-                    {/* Account numbers row */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-                      {customer.loan_account_numbers?.map((accNo, idx) => (
-                        <div key={idx} style={{ fontSize: '13px', color: '#595959', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{idx + 1}. {accNo}</span>
-                          <Tag color="green" style={{ fontSize: '11px' }}>Completed</Tag>
-                        </div>
-                      ))}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span className="loan-customer-name">
+                      {accountSuffix ? `${accountSuffix} - ` : ''}{customerName}
+                    </span>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #d9d9d9', borderRadius: '19px', backgroundColor: '#fff', fontWeight: '600', fontSize: '22px', marginRight: '20px' }}>
+                      {loanCount}
                     </div>
                   </div>
+                  {customer.loans?.length > 0 && (
+                    <div style={{ marginTop: '4px' }}>
+                      {customer.loans.map(l => (
+                        <Tag key={l.loan_account_number} style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                          {getLastNonZeroDigits(l.loan_account_number, 8)}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {/* View-only menu */}
-                <div className="loan-customer-actions">
+                {/* + icon only, NO 3-dot menu */}
+                <div className="loan-customer-actions" onClick={(e) => e.stopPropagation()}>
+                  {loanCount < 2 && (
+                    <Button
+                      type="primary" shape="circle" icon={<PlusOutlined />} size="small"
+                      onClick={(e) => { e.stopPropagation(); handleAddLoan(customer); }}
+                      style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}
+                    />
+                  )}
+                </div>
+              </div>
+            }
+          />
+        </List.Item>
+        {isExpanded && (
+          <div className="loan-collapse-content" style={{ padding: '16px', background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
+            {expandLoading && detailLoans.length === 0
+              ? <div style={{ textAlign: 'center', padding: '20px' }}><Spin tip="Loading loan details..." /></div>
+              : renderLoanDetailCards(detailLoans)
+            }
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Render: completed item ───────────────────────────────────────────────────
+  const renderCompletedItem = (customer, index) => {
+    const cid = String(customer.customer_id ?? customer.id);
+    const isExpanded = String(expandedCompletedCustomerId) === cid;
+    const loanCount = customer.total_active_loans ?? customer.loans?.length ?? 0;
+    const customerName = customer.customer_name ?? 'N/A';
+    const firstAcc = customer.loans?.[0]?.loan_account_number ?? '';
+    const accountSuffix = firstAcc ? String(firstAcc).slice(-6).replace(/^0+/, '') || String(firstAcc).slice(-1) : '';
+
+    if (isMobile) {
+      return (
+        <div key={cid} className="loan-mobile-item-wrapper" style={{ marginBottom: '12px' }}>
+          <div style={{ position: 'relative' }}>
+            <SwipeablePanel
+              item={{ ...customer, lineIndex: index + 1, displayTitle: `${accountSuffix ? accountSuffix + ' - ' : ''}${customerName}` }}
+              titleKey="displayTitle"
+              name="completed-loan"
+              isSwipeOpen={openCompletedSwipeId === cid}
+              onSwipeStateChange={(isOpen) => {
+                if (isOpen) setOpenCompletedSwipeId(cid);
+                else if (openCompletedSwipeId === cid) setOpenCompletedSwipeId(null);
+              }}
+              isExpanded={isExpanded}
+              onExpandToggle={() => handleCompletedExpandToggle(customer)}
+              disableAutoScroll={true}
+              renderContent={() => <CompletedLoanCollapseContent customer={customer} />}
+            />
+            {!isExpanded && openCompletedSwipeId !== cid && (
+              <div style={{ position: 'absolute', right: '5px', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '35px', height: '35px', border: '1px solid #d9d9d9', borderRadius: '17.5px', backgroundColor: '#fff', fontWeight: '600', fontSize: '20px', marginRight: '5px' }}>
+  {loanCount}
+</div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={cid} className="loan-customer-list-item-wrapper">
+        <List.Item
+          className={isExpanded ? 'loan-customer-list-item loan-list-item-expanded' : 'loan-customer-list-item'}
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleCompletedExpandToggle(customer)}
+        >
+          <List.Item.Meta
+            avatar={<div className="loan-customer-index-badge">{index + 1}</div>}
+            title={
+              <div className="loan-customer-title-container">
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span className="loan-customer-name">{accountSuffix ? `${accountSuffix} - ` : ''}{customerName}</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', border: '1px solid #d9d9d9', borderRadius: '19px', backgroundColor: '#fff', fontWeight: '600', fontSize: '22px', marginRight: '20px' }}>
+  {loanCount}
+</div>
+                  </div>
+                </div>
+                <div className="loan-customer-actions" onClick={(e) => e.stopPropagation()}>
                   <Dropdown overlay={renderCompletedCustomerMenu(customer)} trigger={['click']}>
                     <EllipsisOutlined className="loan-ellipsis-icon" onClick={(e) => e.stopPropagation()} />
                   </Dropdown>
@@ -682,8 +862,8 @@ const LoanDisbursementList = () => {
             }
           />
         </List.Item>
-        {expandedCompletedCustomers[customer.id] && (
-          <div className="loan-collapse-content" style={{ padding: '16px', background: '#fafafa' }}>
+        {isExpanded && (
+          <div className="loan-collapse-content" style={{ padding: '16px', background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
             <CompletedLoanCollapseContent customer={customer} />
           </div>
         )}
@@ -691,75 +871,52 @@ const LoanDisbursementList = () => {
     );
   };
 
-  // ─── Empty State Component ─────────────────────────────────────────────────
   const EmptyState = ({ type = 'disburse' }) => {
     const isCompleted = type === 'completed';
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', padding: '60px 24px', textAlign: 'center',
-      }}>
-        {/* Icon */}
-        <div style={{
-          width: '80px', height: '80px', borderRadius: '50%',
-          backgroundColor: isCompleted ? '#f6ffed' : '#f0f5ff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: '20px',
-        }}>
-          <span
-            className={isCompleted ? 'mdi mdi-check-circle-outline' : 'mdi mdi-bank-outline'}
-            style={{ fontSize: '38px', color: isCompleted ? '#52c41a' : '#4096ff' }}
-          />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
+        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: isCompleted ? '#f6ffed' : '#f0f5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+          <span className={isCompleted ? 'mdi mdi-check-circle-outline' : 'mdi mdi-bank-outline'} style={{ fontSize: '38px', color: isCompleted ? '#52c41a' : '#4096ff' }} />
         </div>
-        {/* Title */}
         <Text style={{ fontSize: '17px', fontWeight: '600', color: '#262626', marginBottom: '8px', display: 'block' }}>
-          {isCompleted ? 'No Completed Loans' : 'No Disbursements Yet'}
+          {isCompleted ? 'No Completed Loans' : 'No Loans Found'}
         </Text>
-        {/* Subtitle */}
         <Text type="secondary" style={{ fontSize: '14px', maxWidth: '280px', lineHeight: '1.6', display: 'block', marginBottom: '24px' }}>
-          {isCompleted
-            ? 'Loans that have been fully repaid will appear here.'
-            : 'No loan disbursements have been recorded. Use the + button on a customer card to add one.'}
+          {isCompleted ? 'Loans that have been fully repaid will appear here.' : 'No pending loan disbursements found.'}
         </Text>
-        {/* Refresh button */}
-        <Button
-          icon={<span className="mdi mdi-refresh" style={{ marginRight: '6px' }} />}
-          onClick={isCompleted ? fetchCompletedLoanData : fetchLoanData}
-          size="middle"
-          style={{ borderRadius: '6px' }}
-        >
+        <Button onClick={isCompleted ? fetchCompletedLoanData : fetchLoanToBeCompleted} size="middle" style={{ borderRadius: '6px' }}>
           Refresh
         </Button>
       </div>
     );
   };
 
-  // ─── JSX ───────────────────────────────────────────────────────────────────
+  const hasMoreLoanToBeCompleted = pagination.displayed < pagination.total;
+  const hasMoreAllActive = allActivePagination.displayed < allActivePagination.total;
+  const hasMoreCompleted = completedPagination.displayed < completedPagination.total;
+
   return (
     <div className="loan-page-content">
-      {loading && <Loader />}
+      {(loading || allActiveLoading) && <Loader />}
 
-      {/* Header */}
       <div className="loan-disbursement-header-container loan-disbursement-header">
         <h2 className="loan-disbursement-title">Loan</h2>
         <div className="loan-disbursement-actions">
-          <Button icon={<SwapOutlined rotate={90} />} onClick={() => notification.info({ message: 'Reorder feature coming soon!' })} type="default" className="loan-action-btn">{!isMobile && "Reorder"}</Button>
-          <Button icon={<SearchOutlined />} onClick={() => setSearchModalVisible(true)} type="default" className="loan-action-btn">{!isMobile && "Search"}</Button>
-          <Button icon={<FilterOutlined />} onClick={() => setFilterModalVisible(true)} type="default" className="loan-action-btn">{!isMobile && "Filter"}</Button>
-          <Dropdown overlay={<Menu><Menu.Item key="export"><div className="d-flex align-items-center gap-1"><span className="mdi mdi-export text-secondary"></span><span>Export Data</span></div></Menu.Item><Menu.Item key="settings"><div className="d-flex align-items-center gap-1"><span className="mdi mdi-cog text-secondary"></span><span>Settings</span></div></Menu.Item></Menu>} trigger={['click']}>
+          <Button icon={<SwapOutlined rotate={90} />} onClick={() => notification.info({ message: 'Reorder coming soon!' })} type="default" className="loan-action-btn">{!isMobile && 'Reorder'}</Button>
+          <Button icon={<FilterOutlined />} onClick={() => setFilterModalVisible(true)} type="default" className="loan-action-btn">{!isMobile && 'Filter'}</Button>
+          <Dropdown overlay={<Menu><Menu.Item key="export">Export Data</Menu.Item></Menu>} trigger={['click']}>
             <Button icon={<EllipsisOutlined rotate={90} />} type="default" className="loan-action-btn" />
           </Dropdown>
         </div>
       </div>
 
-      {/* Summary Accordion */}
       <Card className="loan-accordion-card mb-3" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: '72px', zIndex: 99, backgroundColor: '#fff' }}>
-        <Collapse activeKey={accordionOpen ? ['summary'] : []} onChange={() => setAccordionOpen(!accordionOpen)} expandIconPosition='end' style={{ border: 'none', background: 'transparent' }}>
-          <Panel
+        <Collapse activeKey={accordionOpen ? ['summary'] : []} onChange={() => setAccordionOpen(!accordionOpen)} expandIconPosition="end" style={{ border: 'none', background: 'transparent' }}>
+          <Collapse.Panel
             header={
               <Row justify="space-between" align="middle" style={{ width: '100%' }}>
-                <Col><Text style={{ fontSize: '16px', fontWeight: "bold" }}>Date: 03/02/2026</Text></Col>
-                <Col><Text style={{ fontSize: '16px', fontWeight: "bold" }}>Bal: 284303</Text></Col>
+                <Col><Text style={{ fontSize: '16px', fontWeight: 'bold' }}>Date: 03/02/2026</Text></Col>
+                <Col><Text style={{ fontSize: '16px', fontWeight: 'bold' }}>Bal: 284303</Text></Col>
               </Row>
             }
             key="summary" style={{ border: 'none' }}
@@ -784,144 +941,114 @@ const LoanDisbursementList = () => {
                 </tbody>
               </table>
             </div>
-          </Panel>
+          </Collapse.Panel>
         </Collapse>
       </Card>
 
-      {/* Tabs */}
       <Card className="loan-tabs-card" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: accordionOpen ? '220px' : '130px', zIndex: 98, backgroundColor: '#fff', transition: 'top 0.3s ease' }}>
         <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ paddingLeft: '8px' }}>
 
-          {/* DISBURSE Tab */}
           <Tabs.TabPane tab={<span>DISBURSE</span>} key="pay">
             <div style={{ marginBottom: '16px' }}>
-              <Checkbox checked={showAllCustomers} onChange={(e) => setShowAllCustomers(e.target.checked)}>Show All Customers</Checkbox>
+              <Checkbox checked={showAllCustomers} onChange={(e) => setShowAllCustomers(e.target.checked)}>
+                Show All Customers
+              </Checkbox>
             </div>
+
             <div id="scrollableDiv" className="loan-scrollable-div">
-              <InfiniteScroll
-                dataLength={pagination.displayed} next={loadMoreCustomers} hasMore={hasMoreData}
-                loader={<div className="loan-skeleton-container"><Skeleton avatar paragraph={{ rows: 2 }} active /></div>}
-                endMessage={displayedLoans.length > 0 && <Divider plain className="loan-divider-container"><span className="loan-divider-star">★ </span><span className="loan-divider-text">End of List</span><span className="loan-divider-star"> ★</span></Divider>}
-                scrollableTarget="scrollableDiv"
-              >
-                <List dataSource={displayedLoans.slice(0, pagination.displayed)} renderItem={renderLoanItem} />
-              </InfiniteScroll>
-              {displayedLoans.length === 0 && !loading && disburseFetched && (
-                <EmptyState type="disburse" />
+              {showAllCustomers ? (
+                <>
+                  {allActiveLoading ? (
+                    <><Skeleton avatar paragraph={{ rows: 2 }} active /><Skeleton avatar paragraph={{ rows: 2 }} active /></>
+                  ) : (
+                    <InfiniteScroll
+                      dataLength={allActivePagination.displayed}
+                      next={loadMoreAllActive}
+                      hasMore={hasMoreAllActive}
+                      loader={<Skeleton avatar paragraph={{ rows: 2 }} active />}
+                      endMessage={displayedAllActive.length > 0 && <Divider plain className="loan-divider-container">★ End of List ★</Divider>}
+                      scrollableTarget="scrollableDiv"
+                    >
+                      <List dataSource={displayedAllActive.slice(0, allActivePagination.displayed)} renderItem={renderAllActiveItem} />
+                    </InfiniteScroll>
+                  )}
+                  {!allActiveLoading && allActiveFetched && displayedAllActive.length === 0 && <EmptyState type="disburse" />}
+                </>
+              ) : (
+                <>
+                  {loading ? (
+                    <><Skeleton avatar paragraph={{ rows: 2 }} active /><Skeleton avatar paragraph={{ rows: 2 }} active /></>
+                  ) : (
+                    <InfiniteScroll
+                      dataLength={pagination.displayed}
+                      next={loadMoreLoanToBeCompleted}
+                      hasMore={hasMoreLoanToBeCompleted}
+                      loader={<div className="loan-skeleton-container"><Skeleton avatar paragraph={{ rows: 2 }} active /></div>}
+                      endMessage={displayedLoanToBeCompleted.length > 0 && <Divider plain className="loan-divider-container">★ End of List ★</Divider>}
+                      scrollableTarget="scrollableDiv"
+                    >
+                      <List dataSource={displayedLoanToBeCompleted.slice(0, pagination.displayed)} renderItem={renderLoanToBeCompletedItem} />
+                    </InfiniteScroll>
+                  )}
+                  {!loading && loanToBeCompletedFetched && displayedLoanToBeCompleted.length === 0 && <EmptyState type="disburse" />}
+                </>
               )}
             </div>
           </Tabs.TabPane>
 
-          {/* COLLECT Tab */}
           <Tabs.TabPane tab={<span>COLLECT</span>} key="collect">
             <div style={{ textAlign: 'center', padding: '80px 20px' }}>
               <Text type="secondary" style={{ fontSize: '16px', fontStyle: 'italic' }}>Collection feature coming soon...</Text>
             </div>
           </Tabs.TabPane>
 
-          {/* COMPLETED Tab */}
           <Tabs.TabPane tab={<span>COMPLETED</span>} key="completed">
             <div id="completedScrollableDiv" className="loan-scrollable-div">
               {completedLoading ? (
-                <div className="loan-skeleton-container">
-                  <Skeleton avatar paragraph={{ rows: 2 }} active />
-                  <Skeleton avatar paragraph={{ rows: 2 }} active />
-                  <Skeleton avatar paragraph={{ rows: 2 }} active />
-                </div>
+                <><Skeleton avatar paragraph={{ rows: 2 }} active /><Skeleton avatar paragraph={{ rows: 2 }} active /></>
               ) : (
                 <InfiniteScroll
-                  dataLength={completedPagination.displayed} next={loadMoreCompletedCustomers} hasMore={hasMoreCompletedData}
-                  loader={<div className="loan-skeleton-container"><Skeleton avatar paragraph={{ rows: 2 }} active /></div>}
-                  endMessage={displayedCompletedLoans.length > 0 && <Divider plain className="loan-divider-container"><span className="loan-divider-star">★ </span><span className="loan-divider-text">End of List</span><span className="loan-divider-star"> ★</span></Divider>}
+                  dataLength={completedPagination.displayed}
+                  next={loadMoreCompleted}
+                  hasMore={hasMoreCompleted}
+                  loader={<Skeleton avatar paragraph={{ rows: 2 }} active />}
+                  endMessage={displayedCompleted.length > 0 && <Divider plain>★ End of List ★</Divider>}
                   scrollableTarget="completedScrollableDiv"
                 >
-                  <List dataSource={displayedCompletedLoans.slice(0, completedPagination.displayed)} renderItem={renderCompletedLoanItem} />
+                  <List dataSource={displayedCompleted.slice(0, completedPagination.displayed)} renderItem={renderCompletedItem} />
                 </InfiniteScroll>
               )}
-              {displayedCompletedLoans.length === 0 && !completedLoading && completedFetched && (
-                <EmptyState type="completed" />
-              )}
+              {!completedLoading && completedFetched && displayedCompleted.length === 0 && <EmptyState type="completed" />}
             </div>
           </Tabs.TabPane>
-
         </Tabs>
       </Card>
 
-      {/* Search Modal */}
-      <Modal title={null} open={searchModalVisible}
-        onCancel={() => { setSearchModalVisible(false); searchForm.resetFields(); setSelectedLineId(null); setFilteredAreaList([]); }}
-        onOk={() => { searchForm.validateFields().then((values) => { notification.success({ message: 'Search Applied', description: 'Searching with selected criteria...' }); setSearchModalVisible(false); }).catch(info => console.log('Validation Failed:', info)); }}
-        width={600} centered okText="Search" cancelText="Cancel"
-      >
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}><h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>Search Loans</h3></div>
-        <Form form={searchForm} layout="vertical">
-          <Form.Item name="date" label="Date" rules={[{ required: true, message: "Please select a date" }]}>
-            <DatePicker style={{ width: "100%" }} placeholder="Select Date" format="YYYY-MM-DD" size="large" suffixIcon={<CalendarOutlined />} />
-          </Form.Item>
-          <Form.Item name="lineId" label="Line" rules={[{ required: true, message: "Please select a line" }]}>
-            <SelectWithAddon icon={<ApartmentOutlined />} placeholder="Select Line" showSearch size="large" loading={lineLoading} onChange={handleLineChange}
-              notFoundContent={lineLoading ? <Spin size="small" /> : "No lines found"}
-              filterOption={(input, option) => option.children.toLowerCase().includes(input.toLowerCase())}
-            >
-              {lineDropdownList.map((line) => (<Select.Option key={line.line_id} value={line.line_id}>{line.line_name}</Select.Option>))}
-            </SelectWithAddon>
-          </Form.Item>
-          <Form.Item name="areaIds" label="Area" rules={[{ required: true, message: "Please select at least one area" }]} style={{ marginBottom: '32px' }}>
-            <SelectWithAddon icon={<EnvironmentOutlined />} placeholder={selectedLineId ? "Select Areas" : "Select Line first"} showSearch size="large" mode="multiple"
-              loading={areaLoading} disabled={!selectedLineId} allowClear
-              notFoundContent={areaLoading ? <Spin size="small" /> : "No areas found"}
-              filterOption={(input, option) => option.children.toLowerCase().includes(input.toLowerCase())}
-              open={areaDropdownOpen} onDropdownVisibleChange={(open) => setAreaDropdownOpen(open)}
-              dropdownRender={(menu) => (<>{menu}<div style={{ padding: '4px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'center' }}><Button style={{ background: "#28a745", color: "white" }} size="small" onClick={() => setAreaDropdownOpen(false)}>Select Done ✓</Button></div></>)}
-            >
-              {filteredAreaList.map((area) => (<Select.Option key={area.id} value={area.id}>{area.areaName}</Select.Option>))}
-            </SelectWithAddon>
-          </Form.Item>
-        </Form>
+      <Modal title="Filter Options" open={filterModalVisible} onCancel={() => setFilterModalVisible(false)} footer={null}>
+        <p>Filter by loan status, amount, date, etc.</p>
       </Modal>
 
-      {/* Filter Modal */}
-      <Modal title={<div className="loan-search-modal-title">Filter Options</div>} open={filterModalVisible} onCancel={() => setFilterModalVisible(false)} footer={null}>
-        <p className="loan-search-modal-label">Filter by loan status, amount, date, etc.</p>
-      </Modal>
-
-      {/* Loan Selection Modal */}
       <Modal title={null} open={loanSelectionModalVisible} onOk={handleLoanSelectionOk} onCancel={handleLoanSelectionCancel} width={500} centered okText="Edit Selected Loan" cancelText="Cancel">
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>Select Loan to Edit</h3>
-          <Text type="secondary" style={{ fontSize: '14px' }}>Customer: {selectedCustomerForEdit?.customerName || selectedCustomerForEdit?.LOAN_DSBRSMNT_CUST_NM}</Text>
+          <Text type="secondary">{selectedCustomerForEdit?.customer_name}</Text>
         </div>
         <Form form={loanSelectionForm} layout="vertical">
-          <Form.Item name="loanSelection" label="Select Loan" rules={[{ required: true, message: "Please select a loan" }]}>
+          <Form.Item name="loanSelection" label="Select Loan" rules={[{ required: true, message: 'Please select a loan' }]}>
             <Select size="large" placeholder="Choose a loan to edit" allowClear>
-              {selectedCustomerForEdit?.loans?.map((loan) => {
-                const loanNumber = loan.loanAccountNumber || loan.loan_account_number;
-                const loanAmount = loan.loanAmount || loan.loan_dsbrsmnt_amnt;
-                const maskedNumber = getMaskedAccountNumber(loanNumber);
-                const loanDate = loan.loan_dsbrsmnt_dt
-                  ? new Date(loan.loan_dsbrsmnt_dt).toLocaleDateString('en-IN', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })
-                  : '';
-
-                return (
-                  <Select.Option key={loan.id} value={loan.id}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>
-                        {maskedNumber}
+              {selectedCustomerForEdit?.resolvedLoans?.map((loan) => (
+                <Select.Option key={loan.id} value={loan.id}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, fontFamily: 'monospace' }}>{getMaskedAccountNumber(loan.loan_account_number)}</span>
+                    <Space size="small">
+                      <span style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                        {loan.loan_dsbrsmnt_dt ? new Date(loan.loan_dsbrsmnt_dt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
                       </span>
-                      <Space size="small">
-                        <span style={{ fontSize: '12px', color: '#8c8c8c' }}>{loanDate}</span>
-                        <span style={{ fontWeight: 600, color: '#1890ff' }}>
-                          ₹{parseFloat(loanAmount).toLocaleString()}
-                        </span>
-                      </Space>
-                    </div>
-                  </Select.Option>
-                );
-              })}
+                      <span style={{ fontWeight: 600, color: '#1890ff' }}>₹{parseFloat(loan.loan_dsbrsmnt_amnt || 0).toLocaleString()}</span>
+                    </Space>
+                  </div>
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
         </Form>

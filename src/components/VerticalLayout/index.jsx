@@ -41,6 +41,7 @@ import leftIcon from "../../assets/icons/hide.png"
 import "./VerticalLayout.css";
 import { FloatButton } from 'antd';
 import firmIcon from "../../assets/icons/government.png"
+import houseViewIcon from "../../assets/icons/home.png"
 
 
 const { Header, Sider, Content } = Layout;
@@ -370,6 +371,7 @@ const VerticalLayout = (props) => {
     },
     { key: '/reset-password', icon:<img src={resetIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Reset Password' },
     { key: '/view-customer', icon: <img src={customerIcon} style={{filter: isMobile ? 'none' : 'invert(1)',}} />, label: 'Customer' },
+      { key: '/house-view', icon: <img src={homeIcon} style={{filter: isMobile ? 'none' : 'invert(1)'}} />, label: 'House View' },
   ], [isMobile]);
 
   useEffect(() => {

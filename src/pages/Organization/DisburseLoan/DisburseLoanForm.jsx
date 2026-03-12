@@ -1,7 +1,6 @@
 import {
   Form,
   Input,
-  DatePicker,
   InputNumber,
   Button,
   Divider,
@@ -12,19 +11,14 @@ import {
   Grid,
   Select,
   Empty,
-} from "antd";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
-import {
-  DISBURSE_LOAN,
-  CUSTOMERS,
-} from "helpers/url_helper";
-import { getDetails, getList } from "helpers/getters";
-import { Fragment, useState, useEffect, useCallback } from "react";
-import Loader from "components/Common/Loader";
+  Spin,
+} from 'antd';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Fragment, useState, useEffect, useCallback } from 'react';
+import Loader from 'components/Common/Loader';
 import {
   ReloadOutlined,
   CalendarOutlined,
-  UserOutlined,
   SyncOutlined,
   DollarOutlined,
   PercentageOutlined,
@@ -36,14 +30,18 @@ import {
   ApartmentOutlined,
   EnvironmentOutlined,
   CommentOutlined,
-} from "@ant-design/icons";
-import { POST, PUT } from "helpers/api_helper";
-import { devLog } from "../../../utils/environment";
-import SelectWithAddon from "components/Common/SelectWithAddon";
-import InputWithAddon from "components/Common/InputWithAddon";
+} from '@ant-design/icons';
+import { GET, POST, PUT } from 'helpers/api_helper';
+import { devLog } from '../../../utils/environment';
+import SelectWithAddon from 'components/Common/SelectWithAddon';
+import InputWithAddon from 'components/Common/InputWithAddon';
 import './DisburseLoanForm.css';
 
 const { TextArea } = Input;
+
+// ── Payment mode value mapping (API uses integers) ───────────────────────────
+const MODE_TO_INT = { Cash: '1', Online: '2', Both: '3' };
+const INT_TO_MODE = { 1: 'Cash', 2: 'Online', 3: 'Both', '1': 'Cash', '2': 'Online', '3': 'Both' };
 
 const DisburseLoanForm = () => {
   const [form] = Form.useForm();
@@ -51,67 +49,33 @@ const DisburseLoanForm = () => {
   const params = useParams();
   const location = useLocation();
 
+  // ── State ──────────────────────────────────────────────────────────────────
   const [customerList, setCustomerList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loan, setLoan] = useState(null);
+  const [customerLoading, setCustomerLoading] = useState(false);
   const [apiError, setApiError] = useState(false);
-  const [paymentMode, setPaymentMode] = useState("Online");
-  const [selectedCustomerName, setSelectedCustomerName] = useState("");
+  const [paymentMode, setPaymentMode] = useState('Online');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
+
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
-  const isMobile = !screens.md;
+
+  // Branch / Line / Area
   const [branchId, setBranchId] = useState(null);
   const [lineId, setLineId] = useState(null);
   const [areaId, setAreaId] = useState(null);
-  const [branchName, setBranchName] = useState("");
-  const [lineName, setLineName] = useState("");
-  const [areaName, setAreaName] = useState("");
-  const [createdBy, setCreatedBy] = useState(null);
-  const [updatedBy, setUpdatedBy] = useState(null);
+  const [branchName, setBranchName] = useState('');
+  const [lineName, setLineName] = useState('');
+  const [areaName, setAreaName] = useState('');
 
-  // Get data from navigation state
+  // Navigation state
   const navigationState = location.state || {};
-  const { mode, customerId, customerName, loanData } = navigationState;
+  const { mode, customerId, customerName: navCustomerName, loanData } = navigationState;
 
-  // ─── Normalise customer list ─────────────────────────────────────────────────
-  // API may return an array, an object like {"detail":"No Customer Exist"}, or null.
-  const normaliseCustomers = (raw) => {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-    // Object response such as { detail: "No Customer Exist" }
-    if (typeof raw === "object") {
-      const msg = raw.detail || raw.message || raw.error || "No customers found.";
-      notification.error({
-        message: "Customer List Unavailable",
-        description: msg,
-        duration: 5,
-      });
-      return [];
-    }
-    return [];
-  };
-
-  const loadCustomerData = useCallback(async () => {
-    try {
-      setCustomerList([]);
-      const customers = await getList(CUSTOMERS);
-      devLog("Customer list loaded:", customers);
-      setCustomerList(normaliseCustomers(customers));
-    } catch (error) {
-      console.error("Error loading customer list:", error);
-      notification.warning({
-        message: "Customer List Unavailable",
-        description: "Failed to load customer list. Please try again.",
-        duration: 5,
-      });
-      setApiError(true);
-    }
-  }, []);
-
+  // ── Determine mode ─────────────────────────────────────────────────────────
   useEffect(() => {
-    // Determine mode from URL params and navigation state
     if (params.mode === 'edit' || mode === 'edit' || (params.id && params.id !== 'add')) {
       setIsEditMode(true);
       setIsAddMode(false);
@@ -120,47 +84,83 @@ const DisburseLoanForm = () => {
       setIsEditMode(false);
     }
 
-    // Set customer name if provided from navigation
-    if (customerName) {
-      setSelectedCustomerName(customerName);
-    }
-
-    // Set branch, line, and area IDs from navigation state
     if (navigationState.branchId) setBranchId(navigationState.branchId);
     if (navigationState.lineId) setLineId(navigationState.lineId);
     if (navigationState.areaId) setAreaId(navigationState.areaId);
     if (navigationState.branchName) setBranchName(navigationState.branchName);
     if (navigationState.lineName) setLineName(navigationState.lineName);
     if (navigationState.areaName) setAreaName(navigationState.areaName);
+  }, []);
 
-    loadCustomerData();
-  }, [params.mode, params.id, mode, customerName, navigationState, loadCustomerData]);
+  // ── Fetch customer dropdown — filtered by area_id ──────────────────────────
+  const loadCustomerList = useCallback(async (areaIdParam) => {
+    try {
+      setCustomerLoading(true);
+      const url = areaIdParam
+        ? `api/customer_dd/?area_id=${areaIdParam}`
+        : 'api/customer_dd/';
+      const response = await GET(url);
+      if (response?.status === 200) {
+        const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
+        setCustomerList(raw);
+        devLog('customer_dd loaded:', raw);
+      } else {
+        notification.warning({
+          message: 'Customer List Unavailable',
+          description: 'Failed to load customer list.',
+          duration: 5,
+        });
+        setCustomerList([]);
+      }
+    } catch (err) {
+      console.error('Error loading customer_dd:', err);
+      notification.warning({
+        message: 'Customer List Unavailable',
+        description: 'Failed to load customer list. Please try again.',
+        duration: 5,
+      });
+      setApiError(true);
+      setCustomerList([]);
+    } finally {
+      setCustomerLoading(false);
+    }
+  }, []);
 
-  // Load loan data if in edit mode
+  // ── On mount: load customers filtered by area_id from localStorage ──────────
   useEffect(() => {
-    // Only fetch loan details if we're in edit mode AND have a valid numeric loan ID
+    const selectedAreaId = localStorage.getItem('selected_area_id') ?? null;
+    loadCustomerList(selectedAreaId);
+  }, [loadCustomerList]);
+
+  // ── Load loan details for EDIT mode ───────────────────────────────────────
+  useEffect(() => {
     if (isEditMode && params.id && params.id !== 'add' && !isNaN(params.id)) {
       setLoading(true);
-      getDetails(DISBURSE_LOAN, params.id)
-        .then((res) => {
-          devLog("Loan details loaded:", res);
-          setLoan(res);
-          setPaymentMode(res.loan_dsbrsmnt_mode || "Online");
+      GET(`api/disburse_loan/${params.id}/`)
+        .then((response) => {
+          const res = response?.data ?? response;
+          devLog('Loan details:', res);
 
-          // Save the IDs and names
+          const modeStr = INT_TO_MODE[res.loan_dsbrsmnt_mode] ?? 'Cash';
+          setPaymentMode(modeStr);
           setBranchId(res.loan_dsbrsmnt_brnch_id);
           setLineId(res.loan_dsbrsmnt_line_id);
           setAreaId(res.loan_dsbrsmnt_area_id);
-          setBranchName(res.branch_name || "");
-          setLineName(res.line_name || "");
-          setAreaName(res.area_name || "");
-          setCreatedBy(res.loan_dsbrsmnt_created_by);
-          setUpdatedBy(res.loan_dsbrsmnt_updtd_by);
+          setBranchName(res.LOAN_DSBRSMNT_BRNCH_NM ?? res.branch_name ?? '');
+          setLineName(res.LOAN_DSBRSMNT_LINE_NM ?? res.line_name ?? '');
+          setAreaName(res.LOAN_DSBRSMNT_AREA_NM ?? res.area_name ?? '');
 
-          // Populate form with loan data
+          // Re-fetch customer list — prefer loan's own area, fallback to localStorage
+          const storedAreaId = localStorage.getItem('selected_area_id') ?? null;
+          loadCustomerList(res.loan_dsbrsmnt_area_id ?? storedAreaId);
+
+          const cid = res.loan_dsbrsmnt_cust_id;
+          const found = customerList.find(c => c.id === cid);
+          if (found) setSelectedCustomer(found);
+
           form.setFieldsValue({
-            loan_dsbrsmnt_cust_id: res.loan_dsbrsmnt_cust_id,
-            loan_dsbrsmnt_dt: res.loan_dsbrsmnt_dt || "",
+            loan_dsbrsmnt_cust_id: cid,
+            loan_dsbrsmnt_dt: res.loan_dsbrsmnt_dt ?? '',
             loan_dsbrsmnt_repmnt_type: res.loan_dsbrsmnt_repmnt_type,
             loan_dsbrsmnt_amnt: res.loan_dsbrsmnt_amnt,
             loan_dsbrsmnt_intrst_amnt: res.loan_dsbrsmnt_intrst_amnt,
@@ -169,132 +169,151 @@ const DisburseLoanForm = () => {
             loan_dsbrsmnt_instlmnt_amnt: res.loan_dsbrsmnt_instlmnt_amnt,
             loan_dsbrsmnt_dflt_pay_amnt: res.loan_dsbrsmnt_dflt_pay_amnt,
             loan_dsbrsmnt_bad_loan_days: res.loan_dsbrsmnt_bad_loan_days,
-            loan_dsbrsmnt_mode: res.loan_dsbrsmnt_mode,
-            loan_dsbrsmnt_comnt: res.loan_dsbrsmnt_comnt,
-            loan_dsbrsmnt_online_amnt: res.loan_dsbrsmnt_online_amnt,
-            loan_dsbrsmnt_cash_amnt: res.loan_dsbrsmnt_cash_amnt,
-            loan_dsbrsmnt_online_remarks: res.loan_dsbrsmnt_online_remarks,
-            loan_dsbrsmnt_cash_remarks: res.loan_dsbrsmnt_cash_remarks,
+            loan_dsbrsmnt_mode: modeStr,
+            loan_dsbrsmnt_remark: res.loan_dsbrsmnt_remark ?? res.loan_dsbrsmnt_comnt ?? '',
+            loan_dsbrsmnt_amnt_online: res.loan_dsbrsmnt_amnt_online ?? null,
+            loan_dsbrsmnt_amnt_cash: res.loan_dsbrsmnt_amnt_cash ?? null,
+            loan_dsbrsmnt_amnt_online_remark: res.loan_dsbrsmnt_amnt_online_remark ?? '',
+            loan_dsbrsmnt_amnt_cash_remark: res.loan_dsbrsmnt_amnt_cash_remark ?? '',
           });
-
-          setLoading(false);
         })
         .catch((error) => {
-          console.error("Error fetching loan details:", error);
+          console.error('Error fetching loan details:', error);
           notification.error({
-            message: "Failed to load loan details",
-            description: "Please try again later.",
+            message: 'Failed to load loan details',
+            description: 'Please try again later.',
           });
-          setLoading(false);
-        });
-    } else if (isAddMode && customerId) {
-      // Pre-fill customer ID for add mode
-      setLoading(true);
-
-      // Wait for customer list to load before setting the value
-      const checkCustomerList = setInterval(() => {
-        if (customerList && customerList.length > 0) {
-          clearInterval(checkCustomerList);
-          form.setFieldsValue({
-            loan_dsbrsmnt_cust_id: customerId,
-          });
-          setLoading(false);
-        }
-      }, 100);
-
-      // Timeout after 5 seconds
-      setTimeout(() => {
-        clearInterval(checkCustomerList);
-        if (loading) {
-          form.setFieldsValue({
-            loan_dsbrsmnt_cust_id: customerId,
-          });
-          setLoading(false);
-        }
-      }, 5000);
+        })
+        .finally(() => setLoading(false));
+    } else if (isAddMode) {
+      if (customerId) {
+        form.setFieldsValue({ loan_dsbrsmnt_cust_id: customerId });
+        const found = customerList.find(c => c.id === customerId);
+        if (found) setSelectedCustomer(found);
+      }
+      setLoading(false);
     } else {
       setLoading(false);
     }
-  }, [isEditMode, isAddMode, params.id, customerId, form, customerList]);
+  }, [isEditMode, isAddMode, params.id, customerId]);
 
-  // Update customer name when customer is selected or loaded
+  // ── Re-resolve selected customer when customerList loads ───────────────────
   useEffect(() => {
-    const formCustomerId = form.getFieldValue('loan_dsbrsmnt_cust_id');
-    if (formCustomerId && customerList && customerList.length > 0) {
-      const customer = customerList.find(c => c.id === formCustomerId);
-      if (customer) {
-        setSelectedCustomerName(customer.customer_name || customer.customer_nm);
+    const cid = form.getFieldValue('loan_dsbrsmnt_cust_id');
+    if (cid && customerList.length > 0 && !selectedCustomer) {
+      const found = customerList.find(c => c.id === cid);
+      if (found) {
+        setSelectedCustomer(found);
+        if (isAddMode) {
+          setBranchId(found.branch);
+          setLineId(found.line);
+          setAreaId(found.area);
+          setBranchName(found.branch_name ?? '');
+          setLineName(found.line_name ?? '');
+          setAreaName(found.area_name ?? '');
+        }
       }
     }
-  }, [form.getFieldValue('loan_dsbrsmnt_cust_id'), customerList]);
+  }, [customerList]);
 
+  // ── Customer selection handler ─────────────────────────────────────────────
+  const handleCustomerChange = (selectedId) => {
+    const customer = customerList.find(c => c.id === selectedId);
+    if (customer) {
+      setSelectedCustomer(customer);
+      setBranchId(customer.branch);
+      setLineId(customer.line);
+      setAreaId(customer.area);
+      setBranchName(customer.branch_name ?? '');
+      setLineName(customer.line_name ?? '');
+      setAreaName(customer.area_name ?? '');
+      form.setFieldsValue({ loan_dsbrsmnt_cust_id: selectedId });
+    } else {
+      setSelectedCustomer(null);
+      setBranchId(null); setLineId(null); setAreaId(null);
+      setBranchName(''); setLineName(''); setAreaName('');
+    }
+  };
+
+  // ── Payment mode change ────────────────────────────────────────────────────
+  const handlePaymentModeChange = (value) => {
+    setPaymentMode(value);
+    if (value !== 'Both') {
+      form.setFieldsValue({
+        loan_dsbrsmnt_amnt_online: undefined,
+        loan_dsbrsmnt_amnt_cash: undefined,
+        loan_dsbrsmnt_amnt_online_remark: undefined,
+        loan_dsbrsmnt_amnt_cash_remark: undefined,
+      });
+    }
+  };
+
+  // ── Form submit ────────────────────────────────────────────────────────────
   const onFinish = async (values) => {
+    if (!branchId || !lineId || !areaId) {
+      notification.error({
+        message: 'Missing Required Information',
+        description: 'Branch, Line, and Area information is required. Please select a customer or navigate from the list page.',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
+      const modeInt = MODE_TO_INT[values.loan_dsbrsmnt_mode] ?? '1';
+
       const formData = {
-        // Required IDs
         loan_dsbrsmnt_brnch_id: branchId,
         loan_dsbrsmnt_line_id: lineId,
         loan_dsbrsmnt_area_id: areaId,
         loan_dsbrsmnt_cust_id: values.loan_dsbrsmnt_cust_id,
-
-        // Form values
-        loan_dsbrsmnt_dt: values.loan_dsbrsmnt_dt,
         loan_dsbrsmnt_repmnt_type: values.loan_dsbrsmnt_repmnt_type,
-        loan_dsbrsmnt_amnt: values.loan_dsbrsmnt_amnt,
-        loan_dsbrsmnt_intrst_amnt: values.loan_dsbrsmnt_intrst_amnt,
+        loan_dsbrsmnt_amnt: String(values.loan_dsbrsmnt_amnt),
+        loan_dsbrsmnt_intrst_amnt: String(values.loan_dsbrsmnt_intrst_amnt),
         loan_dsbrsmnt_tot_instlmnt: values.loan_dsbrsmnt_tot_instlmnt,
-        loan_dsbrsmnt_prcsng_fee_amnt: values.loan_dsbrsmnt_prcsng_fee_amnt,
-        loan_dsbrsmnt_instlmnt_amnt: values.loan_dsbrsmnt_instlmnt_amnt,
-        loan_dsbrsmnt_dflt_pay_amnt: values.loan_dsbrsmnt_dflt_pay_amnt,
+        loan_dsbrsmnt_prcsng_fee_amnt: String(values.loan_dsbrsmnt_prcsng_fee_amnt),
+        loan_dsbrsmnt_instlmnt_amnt: String(values.loan_dsbrsmnt_instlmnt_amnt),
+        loan_dsbrsmnt_dflt_pay_amnt: String(values.loan_dsbrsmnt_dflt_pay_amnt),
         loan_dsbrsmnt_bad_loan_days: values.loan_dsbrsmnt_bad_loan_days,
-        loan_dsbrsmnt_mode: values.loan_dsbrsmnt_mode,
-        loan_dsbrsmnt_comnt: values.loan_dsbrsmnt_comnt || "",
+        loan_dsbrsmnt_mode: modeInt,
+        loan_dsbrsmnt_remark: values.loan_dsbrsmnt_remark ?? '',
+        loan_dsbrsmnt_dt: values.loan_dsbrsmnt_dt,
+        loan_dsbrsmnt_amnt_cash: values.loan_dsbrsmnt_mode === 'Both'
+          ? String(values.loan_dsbrsmnt_amnt_cash ?? 0) : null,
+        loan_dsbrsmnt_amnt_online: values.loan_dsbrsmnt_mode === 'Both'
+          ? String(values.loan_dsbrsmnt_amnt_online ?? 0) : null,
+        loan_dsbrsmnt_amnt_cash_remark: values.loan_dsbrsmnt_mode === 'Both'
+          ? (values.loan_dsbrsmnt_amnt_cash_remark ?? '') : null,
+        loan_dsbrsmnt_amnt_online_remark: values.loan_dsbrsmnt_mode === 'Both'
+          ? (values.loan_dsbrsmnt_amnt_online_remark ?? '') : null,
       };
 
-      // Add payment mode specific fields
-      if (values.loan_dsbrsmnt_mode === "Both") {
-        formData.loan_dsbrsmnt_online_amnt = values.loan_dsbrsmnt_online_amnt;
-        formData.loan_dsbrsmnt_cash_amnt = values.loan_dsbrsmnt_cash_amnt;
-        formData.loan_dsbrsmnt_online_remarks = values.loan_dsbrsmnt_online_remarks || "";
-        formData.loan_dsbrsmnt_cash_remarks = values.loan_dsbrsmnt_cash_remarks || "";
-      }
-
-      // Validate required fields
-      if (!formData.loan_dsbrsmnt_brnch_id || !formData.loan_dsbrsmnt_line_id || !formData.loan_dsbrsmnt_area_id) {
-        notification.error({
-          message: "Missing Required Information",
-          description: "Branch, Line, and Area information is required. Please try navigating from the list page again.",
-        });
-        setLoading(false);
-        return;
-      }
+      devLog('Submitting formData:', formData);
 
       let response;
       if (isEditMode && params.id) {
-        response = await PUT(`${DISBURSE_LOAN}${params.id}/`, formData);
+        response = await PUT(`api/disburse_loan/${params.id}/`, formData);
       } else {
-        response = await POST(DISBURSE_LOAN, formData);
+        response = await POST('api/disburse_loan/', formData);
       }
 
       if (response?.status === 200 || response?.status === 201) {
         notification.success({
-          message: `Loan disbursement ${isEditMode ? "updated" : "created"} successfully!`,
-          description: `Loan for ${selectedCustomerName} has been ${isEditMode ? "updated" : "created"}.`,
+          message: `Loan disbursement ${isEditMode ? 'updated' : 'created'} successfully!`,
+          description: `Loan for ${selectedCustomer?.customer_name ?? navCustomerName ?? ''} has been ${isEditMode ? 'updated' : 'created'}.`,
         });
-        navigate("/disburse-loan");
+        navigate('/disburse-loan');
       } else {
-        console.error("API response error:", response);
         notification.error({
-          message: `Failed to ${isEditMode ? "update" : "create"} loan disbursement`,
-          description: response?.data?.message || "Please check your input and try again.",
+          message: `Failed to ${isEditMode ? 'update' : 'create'} loan disbursement`,
+          description: response?.data?.message ?? 'Please check your input and try again.',
         });
       }
     } catch (error) {
       console.error(error);
       notification.error({
-        message: "An error occurred while saving the loan disbursement",
-        description: error.message || "Please try again.",
+        message: 'An error occurred while saving the loan disbursement',
+        description: error.message ?? 'Please try again.',
       });
     } finally {
       setLoading(false);
@@ -302,45 +321,18 @@ const DisburseLoanForm = () => {
   };
 
   const loanRepaymentTypes = [
-    { label: "Daily", value: "Daily" },
-    { label: "Weekly", value: "Weekly" },
-    { label: "Monthly", value: "Monthly" },
+    { label: 'Daily', value: 'Daily' },
+    { label: 'Weekly', value: 'Weekly' },
+    { label: 'Monthly', value: 'Monthly' },
   ];
 
   const paymentModes = [
-    { label: "Cash", value: "Cash" },
-    { label: "Online", value: "Online" },
-    { label: "Both", value: "Both" },
+    { label: 'Cash', value: 'Cash' },
+    { label: 'Online', value: 'Online' },
+    { label: 'Both', value: 'Both' },
   ];
 
-  const handlePaymentModeChange = (value) => {
-    setPaymentMode(value);
-
-    if (value !== "Both") {
-      form.setFieldsValue({
-        loan_dsbrsmnt_online_amnt: undefined,
-        loan_dsbrsmnt_cash_amnt: undefined,
-        loan_dsbrsmnt_online_remarks: undefined,
-        loan_dsbrsmnt_cash_remarks: undefined,
-      });
-    }
-  };
-
-  const handleCustomerChange = (customerId) => {
-    const customer = customerList?.find(c => c.id === customerId);
-    if (customer) {
-      setSelectedCustomerName(customer.customer_name || customer.customer_nm);
-    } else {
-      setSelectedCustomerName("");
-    }
-  };
-
-  const handleReset = () => {
-    form.resetFields();
-    setSelectedCustomerName("");
-    setPaymentMode("Online");
-  };
-
+  // ── Loading / error states ─────────────────────────────────────────────────
   if (loading && customerList.length === 0) {
     return (
       <div className="loan-form-page-content">
@@ -348,15 +340,10 @@ const DisburseLoanForm = () => {
           <div className="row">
             <div className="col-md-12">
               <Card>
-                <div
-                  className="d-flex justify-content-center align-items-center"
-                  style={{ minHeight: "400px" }}
-                >
+                <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
                   <div className="text-center">
                     <Loader />
-                    <p className="mt-3 text-muted">
-                      Loading loan disbursement form...
-                    </p>
+                    <p className="mt-3 text-muted">Loading loan disbursement form...</p>
                   </div>
                 </div>
               </Card>
@@ -374,29 +361,18 @@ const DisburseLoanForm = () => {
           <div className="row">
             <div className="col-md-12">
               <Card>
-                <div
-                  className="d-flex justify-content-center align-items-center"
-                  style={{ minHeight: "400px" }}
-                >
+                <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
                   <div className="text-center">
                     <Alert
                       message="Connection Error"
-                      description="Unable to load the required data. Please check your internet connection and try again."
-                      type="error"
-                      showIcon
-                      className="mb-4"
+                      description="Unable to load the required data. Please check your connection and try again."
+                      type="error" showIcon className="mb-4"
                     />
                     <Space>
-                      <Button
-                        type="primary"
-                        onClick={() => window.location.reload()}
-                        icon={<ReloadOutlined />}
-                      >
+                      <Button type="primary" onClick={() => window.location.reload()} icon={<ReloadOutlined />}>
                         Retry
                       </Button>
-                      <Button onClick={() => navigate("/disburse-loan")}>
-                        Go Back
-                      </Button>
+                      <Button onClick={() => navigate('/disburse-loan')}>Go Back</Button>
                     </Space>
                   </div>
                 </div>
@@ -411,53 +387,56 @@ const DisburseLoanForm = () => {
   return (
     <Fragment>
       <div className="loan-form-page-content">
+        {loading && <Loader />}
         <div className="loan-form-container-fluid">
           <div className="row">
             <div className="col-md-12">
+
               <div className="loan-form-header">
-                <h2 className="loan-form-title">
-                  {isEditMode ? "Edit Loan" : "Add New Loan"}
-                </h2>
+                <h2 className="loan-form-title">{isEditMode ? 'Edit Loan' : 'Add New Loan'}</h2>
               </div>
 
               <div className="loan-form-wrapper">
-                <Form
-                  form={form}
-                  layout="vertical"
-                  onFinish={onFinish}
-                  className="loan-disbursement-form"
-                >
+                <Form form={form} layout="vertical" onFinish={onFinish} className="loan-disbursement-form">
                   <div className="loan-form-container">
-                    {/* Customer and Date Row */}
+
+                    {/* ── Customer + Date ──────────────────────────────────── */}
                     <div className="row mb-2">
                       <div className="col-md-6">
-                        <Form.Item label="Customer Name">
-                          <InputWithAddon
-                            icon={<UserOutlined style={{ color: '#1890ff' }} />}
-                            value={selectedCustomerName}
-                            placeholder="Customer Name"
-                            disabled
-                            style={{
-                              backgroundColor: '#f5f5f5',
-                              color: '#262626',
-                              fontWeight: '500',
-                              cursor: 'not-allowed'
-                            }}
-                          />
-                        </Form.Item>
-
-                        {/* Hidden field to store customer ID */}
                         <Form.Item
                           name="loan_dsbrsmnt_cust_id"
-                          hidden
-                          rules={[
-                            {
-                              required: true,
-                              message: "Customer is required",
-                            },
-                          ]}
+                          label="Customer"
+                          rules={[{ required: true, message: 'Please select a customer' }]}
                         >
-                          <Input type="hidden" />
+                          <Select
+                            showSearch
+                            placeholder="Search and select customer"
+                            size="large"
+                            loading={customerLoading}
+                            onChange={handleCustomerChange}
+                            disabled={isEditMode}
+                            notFoundContent={
+                              customerLoading
+                                ? <Spin size="small" />
+                                : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No customers found" />
+                            }
+                            filterOption={(input, option) => {
+                              const label = option?.children?.toString()?.toLowerCase() ?? '';
+                              return label.includes(input.toLowerCase());
+                            }}
+                            optionLabelProp="label"
+                          >
+                            {customerList.map(c => (
+                              <Select.Option key={c.id} value={c.id} label={c.customer_name}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontWeight: 600 }}>{c.customer_name}</span>
+                                  <span style={{ fontSize: '11px', color: '#8c8c8c' }}>
+                                    {c.customer_id} · {c.area_name}, {c.line_name}
+                                  </span>
+                                </div>
+                              </Select.Option>
+                            ))}
+                          </Select>
                         </Form.Item>
                       </div>
 
@@ -465,57 +444,25 @@ const DisburseLoanForm = () => {
                         <Form.Item
                           name="loan_dsbrsmnt_dt"
                           label="Disbursement Date"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please select a date",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please select a date' }]}
                         >
-                          <div style={{
-                            display: 'flex',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '6px',
-                            overflow: 'hidden',
-                            height: '40px',
-                          }}>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '44px',
-                              backgroundColor: '#fafafa',
-                              borderRight: '1px solid #d9d9d9',
-                              flexShrink: 0
-                            }}>
+                          <div style={{ display: 'flex', border: '1px solid #d9d9d9', borderRadius: '6px', overflow: 'hidden', height: '40px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', backgroundColor: '#fafafa', borderRight: '1px solid #d9d9d9', flexShrink: 0 }}>
                               <CalendarOutlined />
                             </div>
                             <input
                               type="date"
                               autoComplete="off"
-                              onPaste={(e) => e.preventDefault()}
-                              onCopy={(e) => e.preventDefault()}
-                              onCut={(e) => e.preventDefault()}
-                              onContextMenu={(e) => e.preventDefault()}
-                              onDrop={(e) => e.preventDefault()}
-                              value={form.getFieldValue('loan_dsbrsmnt_dt') || ''}
-                              onChange={(e) => {
-                                form.setFieldsValue({ loan_dsbrsmnt_dt: e.target.value });
-                              }}
-                              style={{
-                                flex: 1,
-                                border: 'none',
-                                outline: 'none',
-                                padding: '0 11px',
-                                fontSize: '14px',
-                                width: '100%',
-                              }}
+                              value={form.getFieldValue('loan_dsbrsmnt_dt') ?? ''}
+                              onChange={(e) => form.setFieldsValue({ loan_dsbrsmnt_dt: e.target.value })}
+                              style={{ flex: 1, border: 'none', outline: 'none', padding: '0 11px', fontSize: '14px', width: '100%' }}
                             />
                           </div>
                         </Form.Item>
                       </div>
                     </div>
 
+                    {/* ── Branch / Line / Area (read-only) ─────────────────── */}
                     <div className="row mb-2">
                       <div className="col-md-4">
                         <Form.Item label="Branch">
@@ -523,402 +470,210 @@ const DisburseLoanForm = () => {
                             icon={<BankOutlined />}
                             value={branchName}
                             disabled
-                            style={{
-                              backgroundColor: '#f5f5f5',
-                              color: '#000',
-                              cursor: 'not-allowed'
-                            }}
+                            placeholder="Auto-filled from customer"
+                            style={{ backgroundColor: '#f5f5f5', color: '#000', cursor: 'not-allowed' }}
                           />
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item label="Line">
                           <InputWithAddon
                             icon={<ApartmentOutlined />}
                             value={lineName}
                             disabled
-                            style={{
-                              backgroundColor: '#f5f5f5',
-                              color: '#000',
-                              cursor: 'not-allowed'
-                            }}
+                            placeholder="Auto-filled from customer"
+                            style={{ backgroundColor: '#f5f5f5', color: '#000', cursor: 'not-allowed' }}
                           />
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item label="Area">
                           <InputWithAddon
                             icon={<EnvironmentOutlined />}
                             value={areaName}
                             disabled
-                            style={{
-                              backgroundColor: '#f5f5f5',
-                              color: '#000',
-                              cursor: 'not-allowed'
-                            }}
+                            placeholder="Auto-filled from customer"
+                            style={{ backgroundColor: '#f5f5f5', color: '#000', cursor: 'not-allowed' }}
                           />
                         </Form.Item>
                       </div>
                     </div>
 
-                    <Divider style={{ borderTop: "1px solid #d9d9d9" }} />
+                    <Divider style={{ borderTop: '1px solid #d9d9d9' }} />
                     <Divider orientation="center">Loan Details</Divider>
 
-                    {/* Repayment Type and Loan Amount Row */}
+                    {/* ── Repayment Type / Loan Amount / Interest ───────────── */}
                     <div className="row mb-2">
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_repmnt_type"
                           label="Repayment Type"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please select repayment type",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please select repayment type' }]}
                         >
-                          <SelectWithAddon
-                            icon={<SyncOutlined />}
-                            placeholder="Select Repayment Type"
-                            allowClear
-                            size="large"
-                            notFoundContent={
-                              <Empty
-                                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                description="No repayment types available"
-                              />
-                            }
-                          >
-                            {loanRepaymentTypes.map((type) => (
-                              <Select.Option
-                                key={type.value}
-                                value={type.value}
-                              >
-                                {type.label}
-                              </Select.Option>
+                          <SelectWithAddon icon={<SyncOutlined />} placeholder="Select Repayment Type" allowClear size="large">
+                            {loanRepaymentTypes.map(t => (
+                              <Select.Option key={t.value} value={t.value}>{t.label}</Select.Option>
                             ))}
                           </SelectWithAddon>
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_amnt"
                           label="Loan Amount"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter loan amount",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter loan amount' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Loan Amount"
-                            min={0}
-                            precision={2}
-                            size="large"
-                            prefix="₹"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <DollarOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Loan Amount"
+                            min={0} precision={2} size="large" prefix="₹" addonBefore={<DollarOutlined />}
                           />
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_intrst_amnt"
                           label="Interest Amount"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter interest amount",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter interest amount' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Interest Amount"
-                            min={0}
-                            precision={2}
-                            size="large"
-                            prefix="₹"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <PercentageOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Interest Amount"
+                            min={0} precision={2} size="large" prefix="₹" addonBefore={<PercentageOutlined />}
                           />
                         </Form.Item>
                       </div>
                     </div>
 
-                    {/* Installments, Processing Fee, Installment Amount Row */}
+                    {/* ── Installments / Processing Fee / Installment Amount ── */}
                     <div className="row mb-2">
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_tot_instlmnt"
                           label="Total Installments"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter number of installments",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter number of installments' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Number of Installments"
-                            min={1}
-                            precision={0}
-                            size="large"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <NumberOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Total Installments"
+                            min={1} precision={0} size="large" addonBefore={<NumberOutlined />}
                           />
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_prcsng_fee_amnt"
                           label="Processing Fee"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter processing fee",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter processing fee' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Processing Fee"
-                            min={0}
-                            precision={2}
-                            size="large"
-                            prefix="₹"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <DollarOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Processing Fee"
+                            min={0} precision={2} size="large" prefix="₹" addonBefore={<DollarOutlined />}
                           />
                         </Form.Item>
                       </div>
-
-                      {/* Installment Amount — fully manual, no auto-calculation */}
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_instlmnt_amnt"
                           label="Installment Amount"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter installment amount",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter installment amount' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Installment Amount"
-                            min={0}
-                            precision={2}
-                            size="large"
-                            prefix="₹"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <WalletOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Installment Amount"
+                            min={0} precision={2} size="large" prefix="₹" addonBefore={<WalletOutlined />}
                           />
                         </Form.Item>
                       </div>
                     </div>
 
-                    {/* Default Pay Amount, Bad Loan Days, Payment Mode Row */}
+                    {/* ── Default Pay / Bad Loan Days / Payment Mode ──────────── */}
                     <div className="row mb-2">
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_dflt_pay_amnt"
                           label="Default Pay Amount"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter default pay amount",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter default pay amount' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Default Pay Amount"
-                            min={0}
-                            precision={2}
-                            size="large"
-                            prefix="₹"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <DollarOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Default Pay Amount"
+                            min={0} precision={2} size="large" prefix="₹" addonBefore={<DollarOutlined />}
                           />
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_bad_loan_days"
                           label="Bad Loan Days"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please enter bad loan days",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please enter bad loan days' }]}
                         >
                           <InputNumber
-                            style={{ width: "100%" }}
-                            placeholder="Enter Bad Loan Days"
-                            min={0}
-                            precision={0}
-                            size="large"
-                            addonBefore={
-                              <span style={{ display: "flex", alignItems: "center" }}>
-                                <FieldTimeOutlined />
-                              </span>
-                            }
+                            style={{ width: '100%' }} placeholder="Enter Bad Loan Days"
+                            min={0} precision={0} size="large" addonBefore={<FieldTimeOutlined />}
                           />
                         </Form.Item>
                       </div>
-
                       <div className="col-md-4">
                         <Form.Item
                           name="loan_dsbrsmnt_mode"
                           label="Payment Mode"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Please select payment mode",
-                            },
-                          ]}
+                          rules={[{ required: true, message: 'Please select payment mode' }]}
                         >
                           <SelectWithAddon
                             icon={<CreditCardOutlined />}
                             placeholder="Select Payment Mode"
-                            allowClear
-                            size="large"
+                            allowClear size="large"
                             onChange={handlePaymentModeChange}
-                            notFoundContent={
-                              <Empty
-                                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                description="No payment modes available"
-                              />
-                            }
                           >
-                            {paymentModes.map((mode) => (
-                              <Select.Option
-                                key={mode.value}
-                                value={mode.value}
-                              >
-                                {mode.label}
-                              </Select.Option>
+                            {paymentModes.map(m => (
+                              <Select.Option key={m.value} value={m.value}>{m.label}</Select.Option>
                             ))}
                           </SelectWithAddon>
                         </Form.Item>
                       </div>
                     </div>
 
-                    {/* Conditional Fields for "Both" Payment Mode */}
-                    {paymentMode === "Both" && (
+                    {/* ── Both mode split ───────────────────────────────────── */}
+                    {paymentMode === 'Both' && (
                       <>
-                        <Divider style={{ borderTop: "1px solid #d9d9d9" }} />
+                        <Divider style={{ borderTop: '1px solid #d9d9d9' }} />
                         <Divider orientation="center">Payment Split Details</Divider>
-
                         <div className="row mb-2">
                           <div className="col-md-6">
                             <Form.Item
-                              name="loan_dsbrsmnt_online_amnt"
+                              name="loan_dsbrsmnt_amnt_online"
                               label="Online Amount"
-                              rules={[
-                                {
-                                  required: true,
-                                  message: "Please enter online amount",
-                                },
-                              ]}
+                              rules={[{ required: true, message: 'Please enter online amount' }]}
                             >
                               <InputNumber
-                                style={{ width: "100%" }}
-                                placeholder="Enter Online Amount"
-                                min={0}
-                                precision={2}
-                                size="large"
-                                prefix="₹"
-                                addonBefore={
-                                  <span style={{ display: "flex", alignItems: "center" }}>
-                                    <BankOutlined />
-                                  </span>
-                                }
+                                style={{ width: '100%' }} placeholder="Enter Online Amount"
+                                min={0} precision={2} size="large" prefix="₹" addonBefore={<BankOutlined />}
                               />
                             </Form.Item>
                           </div>
-
                           <div className="col-md-6">
                             <Form.Item
-                              name="loan_dsbrsmnt_cash_amnt"
+                              name="loan_dsbrsmnt_amnt_cash"
                               label="Cash Amount"
-                              rules={[
-                                {
-                                  required: true,
-                                  message: "Please enter cash amount",
-                                },
-                              ]}
+                              rules={[{ required: true, message: 'Please enter cash amount' }]}
                             >
                               <InputNumber
-                                style={{ width: "100%" }}
-                                placeholder="Enter Cash Amount"
-                                min={0}
-                                precision={2}
-                                size="large"
-                                prefix="₹"
-                                addonBefore={
-                                  <span style={{ display: "flex", alignItems: "center" }}>
-                                    <WalletOutlined />
-                                  </span>
-                                }
+                                style={{ width: '100%' }} placeholder="Enter Cash Amount"
+                                min={0} precision={2} size="large" prefix="₹" addonBefore={<WalletOutlined />}
                               />
                             </Form.Item>
                           </div>
                         </div>
-
                         <div className="row mb-2">
                           <div className="col-md-6">
-                            <Form.Item
-                              name="loan_dsbrsmnt_online_remarks"
-                              label="Online Payment Remarks"
-                            >
+                            <Form.Item name="loan_dsbrsmnt_amnt_online_remark" label="Online Payment Remarks">
                               <TextArea
-                                placeholder="Enter online payment remarks or transaction details"
-                                autoSize={{ minRows: 2, maxRows: 6 }}
-                                allowClear
+                                placeholder="Enter online payment remarks"
+                                autoSize={{ minRows: 2, maxRows: 6 }} allowClear
                               />
                             </Form.Item>
                           </div>
-
                           <div className="col-md-6">
-                            <Form.Item
-                              name="loan_dsbrsmnt_cash_remarks"
-                              label="Cash Payment Remarks"
-                            >
+                            <Form.Item name="loan_dsbrsmnt_amnt_cash_remark" label="Cash Payment Remarks">
                               <TextArea
-                                placeholder="Enter cash payment remarks or details"
-                                autoSize={{ minRows: 2, maxRows: 6 }}
-                                allowClear
+                                placeholder="Enter cash payment remarks"
+                                autoSize={{ minRows: 2, maxRows: 6 }} allowClear
                               />
                             </Form.Item>
                           </div>
@@ -926,15 +681,12 @@ const DisburseLoanForm = () => {
                       </>
                     )}
 
-                    {/* Comments */}
+                    {/* ── Remark ────────────────────────────────────────────── */}
                     <div className="row mb-2">
                       <div className="col-md-12">
-                        <Form.Item
-                          name="loan_dsbrsmnt_comnt"
-                          label="Comments"
-                        >
+                        <Form.Item name="loan_dsbrsmnt_remark" label="Remarks">
                           <TextArea
-                            placeholder="Enter comments or remarks about the loan disbursement"
+                            placeholder="Enter remarks about the loan disbursement"
                             autoSize={{ minRows: 2, maxRows: 6 }}
                             allowClear
                             prefix={<CommentOutlined />}
@@ -943,25 +695,21 @@ const DisburseLoanForm = () => {
                       </div>
                     </div>
 
-                    <Divider style={{ borderTop: "2px solid #d9d9d9" }} />
+                    <Divider style={{ borderTop: '2px solid #d9d9d9' }} />
 
                     <div className="text-center mt-4">
                       <Space size="middle">
-                        <Button
-                          size="large"
-                          onClick={() => navigate("/disburse-loan")}
-                        >
-                          Cancel
-                        </Button>
-
-                        <Button type="primary" htmlType="submit" size="large">
-                          {isEditMode ? "Update Loan" : "Create Loan"}
+                        <Button size="large" onClick={() => navigate('/disburse-loan')}>Cancel</Button>
+                        <Button type="primary" htmlType="submit" size="large" loading={loading}>
+                          {isEditMode ? 'Update Loan' : 'Create Loan'}
                         </Button>
                       </Space>
                     </div>
+
                   </div>
                 </Form>
               </div>
+
             </div>
           </div>
         </div>

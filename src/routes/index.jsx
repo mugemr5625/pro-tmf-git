@@ -29,7 +29,7 @@ import ExpenseTransactionForm from 'pages/Organization/ExpenseTransaction/Expens
 import DisburseLoanForm from 'pages/Organization/DisburseLoan/DisburseLoanForm';
 import DisburseLoanList from 'pages/Organization/DisburseLoan/DisburseLoanList';
 import Location from 'pages/Organization/Location/Location';
-
+import HouseViewPage from 'pages/Organization/HouseView/HouseViewPage';
 // ── Organization (Firm) module ────────────────────────────────────────────────
 import AddOrganization from 'pages/Organization/Organization/AddOrganization';
 import ViewOrganization from 'pages/Organization/Organization/ViewOrganization';
@@ -93,6 +93,8 @@ const authProtectedRoutes = [
   { path: '/new-loan-disbursement/:id', component: <DisburseLoanForm /> },
 
   { path: '/location-list', component: <Location /> },
+  { path: '/house-view', component: <HouseViewPage /> },
+{ path: '/house-view/:id', component: <HouseViewPage /> },  // with customer id
   { path: '/reset-password', component: <ResetPassword /> },
   { path: '/add-customer', component: <AddCustomer /> },
   { path: '/customer/edit/:id', component: <AddCustomer /> },
