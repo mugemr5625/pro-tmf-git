@@ -80,6 +80,7 @@ const LoanDisbursementList = () => {
   const [appliedDate, setAppliedDate] = useState(null);
   const [appliedLineName, setAppliedLineName] = useState(null);
   const [appliedAreaName, setAppliedAreaName] = useState(null);
+  const [appliedAreaId, setAppliedAreaId] = useState(null);   // ← NEW
   const [showSearchReset, setShowSearchReset] = useState(false);
 
   // ── Form instances ──────────────────────────────────────────────────────────
@@ -109,21 +110,28 @@ const LoanDisbursementList = () => {
 
   // ── On mount: fetch loan-to-be-completed + line dropdown + open search modal ─
   useEffect(() => {
-    fetchLoanToBeCompleted();
-    fetchLineDropdown();
-    fetchAllDisburseLoans();
-
-    // Restore last saved values from localStorage and open search modal
-    const savedLineId = localStorage.getItem('selected_line_id');
-    const savedAreaId = localStorage.getItem('selected_area_id');
+    // Restore last saved values from localStorage
+    const savedLineId   = localStorage.getItem('selected_line_id');
+    const savedAreaId   = localStorage.getItem('selected_area_id');
     const savedLineName = localStorage.getItem('selected_line_name');
     const savedAreaName = localStorage.getItem('selected_area_name');
-    const savedDate = localStorage.getItem('selected_search_date');
+    const savedDate     = localStorage.getItem('selected_search_date');
 
     if (savedLineName) setAppliedLineName(savedLineName);
     if (savedAreaName) setAppliedAreaName(savedAreaName);
-    if (savedDate) setAppliedDate(savedDate);
+    if (savedDate)     setAppliedDate(savedDate);
+
+    // Parse saved area_id for API calls
+    const areaIdParam = savedAreaId
+      ? (isNaN(savedAreaId) ? savedAreaId : Number(savedAreaId))
+      : null;
+
+    if (areaIdParam) setAppliedAreaId(areaIdParam);
     if (savedLineName || savedAreaName || savedDate) setShowSearchReset(true);
+
+    fetchLoanToBeCompleted(areaIdParam);   // ← pass saved area_id
+    fetchLineDropdown();
+    fetchAllDisburseLoans();
 
     // Always open search modal on landing
     openSearchModalWithSavedValues(savedLineId, savedAreaId, savedDate);
@@ -138,9 +146,7 @@ const LoanDisbursementList = () => {
       try {
         setAreaLoading(true);
         const response = await GET(`api/area_dd?line_id=${parsedLineId}`);
-        if (response?.status === 200) {
-          setFilteredAreaList(response.data);
-        }
+        if (response?.status === 200) setFilteredAreaList(response.data);
       } catch (error) {
         console.error('Error fetching areas on modal open:', error);
       } finally {
@@ -151,15 +157,12 @@ const LoanDisbursementList = () => {
       const parsedAreaId = isNaN(savedAreaId) ? savedAreaId : Number(savedAreaId);
       searchForm.setFieldsValue({ areaId: parsedAreaId });
     }
-    if (savedDate) {
-      // DatePicker needs a dayjs/moment object; leave raw restore to form if needed
-    }
     setSearchModalVisible(true);
   };
 
   // ── Fetch completed when tab changes ────────────────────────────────────────
   useEffect(() => {
-    if (activeTab === 'completed' && !completedFetched) fetchCompletedLoanData();
+    if (activeTab === 'completed' && !completedFetched) fetchCompletedLoanData(appliedAreaId);
   }, [activeTab]);
 
   // ── Scroll handler ───────────────────────────────────────────────────────────
@@ -182,7 +185,7 @@ const LoanDisbursementList = () => {
   // ── Show all customers toggle ────────────────────────────────────────────────
   useEffect(() => {
     if (showAllCustomers) {
-      if (!allActiveFetched) fetchAllActiveLoans();
+      if (!allActiveFetched) fetchAllActiveLoans(appliedAreaId);
       else {
         setDisplayedAllActive(allActiveLoans);
         setAllActivePagination({ displayed: Math.min(PAGE_SIZE, allActiveLoans.length), total: allActiveLoans.length });
@@ -213,12 +216,10 @@ const LoanDisbursementList = () => {
   // ── Handle line change → fetch areas ────────────────────────────────────────
   const handleLineChange = async (lineId) => {
     setSelectedLineId(lineId);
-    searchForm.setFieldsValue({ areaIds: [] });
+    searchForm.setFieldsValue({ areaId: undefined });
+    setFilteredAreaList([]);
 
-    if (!lineId) {
-      setFilteredAreaList([]);
-      return;
-    }
+    if (!lineId) return;
 
     try {
       setAreaLoading(true);
@@ -227,21 +228,23 @@ const LoanDisbursementList = () => {
         setFilteredAreaList(response.data);
       } else {
         notification.error({ message: 'Failed to fetch areas' });
-        setFilteredAreaList([]);
       }
     } catch (error) {
       console.error('Error fetching areas:', error);
-      setFilteredAreaList([]);
     } finally {
       setAreaLoading(false);
     }
   };
 
-  // ── Fetch loan-to-be-completed ───────────────────────────────────────────────
-  const fetchLoanToBeCompleted = async () => {
+  // ── Fetch loan-to-be-completed (accepts optional areaId param) ───────────────
+  const fetchLoanToBeCompleted = async (areaId = null) => {
     try {
       setLoading(true);
-      const response = await GET('api/loan-to-be-completed/');
+      const aId = areaId ?? appliedAreaId;
+      const url = aId
+        ? `api/loan-to-be-completed/?area_ids=${aId}`
+        : 'api/loan-to-be-completed/';
+      const response = await GET(url);
       if (response?.status === 200) {
         const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
         setLoanToBeCompleted(raw);
@@ -258,11 +261,15 @@ const LoanDisbursementList = () => {
     }
   };
 
-  // ── Fetch all active loans ───────────────────────────────────────────────────
-  const fetchAllActiveLoans = async () => {
+  // ── Fetch all active loans (accepts optional areaId param) ───────────────────
+  const fetchAllActiveLoans = async (areaId = null) => {
     try {
       setAllActiveLoading(true);
-      const response = await GET('api/overall-active-loans/');
+      const aId = areaId ?? appliedAreaId;
+      const url = aId
+        ? `api/overall-active-loans/?area_ids=${aId}`
+        : 'api/overall-active-loans/';
+      const response = await GET(url);
       if (response?.status === 200 && response.data) {
         const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
         setAllActiveLoans(raw);
@@ -279,11 +286,15 @@ const LoanDisbursementList = () => {
     }
   };
 
-  // ── Fetch completed loans ────────────────────────────────────────────────────
-  const fetchCompletedLoanData = async () => {
+  // ── Fetch completed loans (accepts optional areaId param) ───────────────────
+  const fetchCompletedLoanData = async (areaId = null) => {
     try {
       setCompletedLoading(true);
-      const response = await GET('api/loan-already-completed/');
+      const aId = areaId ?? appliedAreaId;
+      const url = aId
+        ? `api/loan-already-completed/?area_ids=${aId}`
+        : 'api/loan-already-completed/';
+      const response = await GET(url);
       if (response?.status === 200 && response.data) {
         const raw = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
         setCompletedLoans(raw);
@@ -450,7 +461,6 @@ const LoanDisbursementList = () => {
 
   // ── Search: apply ────────────────────────────────────────────────────────────
   const handleSearchApply = (values) => {
-    // Resolve names from IDs
     const line = lineDropdownList.find(l => l.line_id === values.lineId);
     const area = filteredAreaList.find(a => a.id === values.areaId);
     const lineName = line?.line_name ?? String(values.lineId);
@@ -465,10 +475,10 @@ const LoanDisbursementList = () => {
     if (dateStr) localStorage.setItem('selected_search_date', dateStr);
     else localStorage.removeItem('selected_search_date');
 
-    // Commit applied values
     setAppliedDate(dateStr);
     setAppliedLineName(lineName);
     setAppliedAreaName(areaName);
+    setAppliedAreaId(values.areaId ?? null);   // ← NEW
     setShowSearchReset(true);
 
     notification.success({
@@ -476,29 +486,33 @@ const LoanDisbursementList = () => {
       description: 'Showing results for selected criteria.',
     });
     setSearchModalVisible(false);
+
+    // Re-fetch both lists with the newly selected area_id
+    setLoanToBeCompletedFetched(false);
+    setAllActiveFetched(false);
+    fetchLoanToBeCompleted(values.areaId);
+    if (showAllCustomers) fetchAllActiveLoans(values.areaId);
+    if (completedFetched) fetchCompletedLoanData(values.areaId);
   };
 
   // ── Search: reset ────────────────────────────────────────────────────────────
   const handleSearchReset = () => {
-    // Clear localStorage
     localStorage.removeItem('selected_line_id');
     localStorage.removeItem('selected_line_name');
     localStorage.removeItem('selected_area_id');
     localStorage.removeItem('selected_area_name');
     localStorage.removeItem('selected_search_date');
 
-    // Clear applied state
     setAppliedDate(null);
     setAppliedLineName(null);
     setAppliedAreaName(null);
+    setAppliedAreaId(null);   // ← NEW
     setShowSearchReset(false);
 
-    // Clear form + dropdown state
     searchForm.resetFields();
     setSelectedLineId(null);
     setFilteredAreaList([]);
 
-    // Re-open search modal so user must pick again
     setSearchModalVisible(true);
   };
 
@@ -544,7 +558,6 @@ const LoanDisbursementList = () => {
     const customerName = customer.customer_name ?? 'N/A';
     const firstAcc = customer.loans?.[0]?.loan_account_number ?? '';
     const accountSuffix = firstAcc ? getLastNonZeroDigits(firstAcc, 6) : '';
-
     const totalPendingEmi = (customer.loans ?? []).reduce((sum, l) => sum + (l.pending_installments ?? 0), 0);
     const detailLoans = getDetailLoansForCustomer(customer, disburseLoanMap);
 
@@ -949,40 +962,7 @@ const LoanDisbursementList = () => {
         </div>
       </div>
 
-      {/* ── Applied search filter chips ─────────────────────────────────────── */}
-      {showSearchReset && (appliedDate || appliedLineName || appliedAreaName) && (
-        <>
-          <Divider style={{ margin: '5px 0' }} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: '4px 0 4px 2px' }}>
-            {appliedDate && (
-              <Tag color="blue" style={{ fontSize: '13px', padding: '2px 10px' }}>
-                Date: {appliedDate}
-              </Tag>
-            )}
-            {appliedLineName && (
-              <Tag color="geekblue" style={{ fontSize: '13px', padding: '2px 10px' }}>
-                Line: {appliedLineName}
-              </Tag>
-            )}
-            {appliedAreaName && (
-              <Tag color="green" style={{ fontSize: '13px', padding: '2px 10px' }}>
-                Area: {appliedAreaName}
-              </Tag>
-            )}
-            <Button
-              type="link"
-              size="small"
-              onClick={handleSearchReset}
-              style={{ padding: '0 8px', height: 'auto', fontSize: '12px', color: '#ff4d4f' }}
-            >
-              ✕ Clear
-            </Button>
-          </div>
-          <Divider style={{ margin: '5px 0' }} />
-        </>
-      )}
-
-      {/* Summary accordion */}
+      {/* ── Summary accordion ────────────────────────────────────────────────── */}
       <Card
         className="loan-accordion-card mb-3"
         style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: '72px', zIndex: 99, backgroundColor: '#fff' }}
@@ -995,10 +975,31 @@ const LoanDisbursementList = () => {
         >
           <Collapse.Panel
             header={
-              <Row justify="space-between" align="middle" style={{ width: '100%' }}>
-                <Col><Text style={{ fontSize: '16px', fontWeight: 'bold' }}>Date: 03/02/2026</Text></Col>
-                <Col><Text style={{ fontSize: '16px', fontWeight: 'bold' }}>Bal: 284303</Text></Col>
-              </Row>
+              <div style={{ width: '100%' }}>
+                {/* ── Row 1: LineName : AreaName (no labels) ── */}
+                <Row justify="space-between" align="middle" style={{ width: '100%', marginBottom: '2px' }}>
+                  <Col>
+                    <Text style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                      {appliedLineName && appliedAreaName
+                        ? `${appliedLineName} : ${appliedAreaName}`
+                        : appliedLineName || appliedAreaName || '— : —'}
+                    </Text>
+                  </Col>
+                </Row>
+                {/* ── Row 2: Date and Balance ── */}
+                <Row justify="space-between" align="middle" style={{ width: '100%' }}>
+                  <Col>
+                    <Text style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                      Date: {appliedDate || '—'}
+                    </Text>
+                  </Col>
+                  <Col>
+                    <Text style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                      Bal: 284303
+                    </Text>
+                  </Col>
+                </Row>
+              </div>
             }
             key="summary"
             style={{ border: 'none' }}
@@ -1118,25 +1119,20 @@ const LoanDisbursementList = () => {
         title={null}
         open={searchModalVisible}
         onCancel={() => {
-          // Allow closing only if a search has already been applied
           if (showSearchReset) {
             setSearchModalVisible(false);
           } else {
             notification.warning({
               message: 'Selection Required',
-              description: 'Please select Date, Line and Area to view loans.',
+              description: 'Please select Line, Area and Date to view loans.',
             });
           }
         }}
         closable={showSearchReset}
         onOk={() => {
           searchForm.validateFields()
-            .then((values) => {
-              handleSearchApply(values);
-            })
-            .catch((info) => {
-              console.log('Validation Failed:', info);
-            });
+            .then((values) => handleSearchApply(values))
+            .catch((info) => console.log('Validation Failed:', info));
         }}
         width={600}
         centered
@@ -1148,20 +1144,8 @@ const LoanDisbursementList = () => {
         </div>
 
         <Form form={searchForm} layout="vertical">
-          <Form.Item
-            name="date"
-            label="Date"
-            rules={[{ required: true, message: 'Please select a date' }]}
-          >
-            <DatePicker
-              style={{ width: '100%' }}
-              placeholder="Select Date"
-              format="YYYY-MM-DD"
-              size="large"
-              suffixIcon={<CalendarOutlined />}
-            />
-          </Form.Item>
 
+          {/* ── 1. Line ── */}
           <Form.Item
             name="lineId"
             label="Line"
@@ -1187,11 +1171,11 @@ const LoanDisbursementList = () => {
             </SelectWithAddon>
           </Form.Item>
 
+          {/* ── 2. Area ── */}
           <Form.Item
             name="areaId"
             label="Area"
             rules={[{ required: true, message: 'Please select an area' }]}
-            style={{ marginBottom: '32px' }}
           >
             <SelectWithAddon
               icon={<EnvironmentOutlined />}
@@ -1213,6 +1197,23 @@ const LoanDisbursementList = () => {
               ))}
             </SelectWithAddon>
           </Form.Item>
+
+          {/* ── 3. Date ── */}
+          <Form.Item
+            name="date"
+            label="Date"
+            rules={[{ required: true, message: 'Please select a date' }]}
+            style={{ marginBottom: '32px' }}
+          >
+            <DatePicker
+              style={{ width: '100%' }}
+              placeholder="Select Date"
+              format="YYYY-MM-DD"
+              size="large"
+              suffixIcon={<CalendarOutlined />}
+            />
+          </Form.Item>
+
         </Form>
       </Modal>
 

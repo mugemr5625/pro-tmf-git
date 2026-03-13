@@ -23,7 +23,7 @@ const ExpenseCollapseContent = ({ expense }) => {
         }}
       >
        
-        <Descriptions.Item label="Branch :">
+        {/* <Descriptions.Item label="Branch :">
           {expense.branch_name || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Line :">
@@ -31,7 +31,7 @@ const ExpenseCollapseContent = ({ expense }) => {
         </Descriptions.Item>
          <Descriptions.Item label="Expense :">
           {expense.name || "N/A"}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
         <Descriptions.Item label="Status :">
           <Tag  style={{ fontSize: "18px" }} color={expense.status === "active" ? "green" : "red"}>
             {expense.status?.toUpperCase() || "N/A"}

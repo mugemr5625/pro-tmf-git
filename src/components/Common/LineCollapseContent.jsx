@@ -25,19 +25,19 @@ const LineCollapseContent = ({ line }) => {
             textOverflow: "ellipsis"
           }}
       >
-        <Descriptions.Item label="Line:">
+        {/* <Descriptions.Item label="Line:">
           {line.lineName || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Branch:">
           {line.branch_name || "N/A"}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
         <Descriptions.Item label="Line Type:">
           {line.lineType || "N/A"}
         </Descriptions.Item>
-        <Descriptions.Item label="Installment:">
+        <Descriptions.Item label="No of Installment:">
           {line.installment ?? "N/A"}
         </Descriptions.Item>
-        <Descriptions.Item label="Addl Installment:">
+        <Descriptions.Item label="No of Addl Installment:">
           {line.badinstallment ?? "N/A"}
         </Descriptions.Item>
       </Descriptions>

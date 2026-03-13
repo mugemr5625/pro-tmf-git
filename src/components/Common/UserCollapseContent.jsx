@@ -159,9 +159,9 @@ const UserCollapseContent = ({ user }) => {
           labelStyle={labelStyle}
           contentStyle={contentStyle}
         >
-          <Descriptions.Item label="User ID:">
+          {/* <Descriptions.Item label="User ID:">
             {user.id || NA}
-          </Descriptions.Item>
+          </Descriptions.Item> */}
 
           <Descriptions.Item label="Username:">
             {user.username || NA}
@@ -170,6 +170,14 @@ const UserCollapseContent = ({ user }) => {
           <Descriptions.Item label="Full Name:">
             {user.full_name || NA}
           </Descriptions.Item>
+            <Descriptions.Item label="Address:" span={2}>
+            {user.address || NA}
+          </Descriptions.Item>
+
+          <Descriptions.Item label="Pin Code:">
+            {user.pin_code || NA}
+          </Descriptions.Item>
+
 
           {/* Email — icon on right */}
           <Descriptions.Item label="Email:">
@@ -205,16 +213,9 @@ const UserCollapseContent = ({ user }) => {
             {baseLine || NA}
           </Descriptions.Item>
 
-          <Descriptions.Item label="Address:" span={2}>
-            {user.address || NA}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Pin Code:">
-            {user.pin_code || NA}
-          </Descriptions.Item>
-
+        
           {/* Line Mapping */}
-          <Descriptions.Item label="Line Mapping:" span={3}>
+          <Descriptions.Item label="Line Allotment:" span={3}>
             {organizedLineMappings.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxWidth: "100%", overflow: "hidden" }}>
                 {organizedLineMappings.map(([branch, lines], index) => {

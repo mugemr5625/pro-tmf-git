@@ -1,14 +1,13 @@
 import { useEffect, useState , useCallback} from "react";
 import { Form, Input, Button, Select, notification, Divider, Space, Spin } from "antd";
 import { 
-  BankOutlined, 
   ApartmentOutlined, 
   EnvironmentOutlined 
 } from '@ant-design/icons';
 import { ToastContainer } from "react-toastify";
 import Loader from "components/Common/Loader";
 import { AREA } from "helpers/url_helper";
-import { POST, GET,PUT } from "helpers/api_helper";
+import { POST, GET, PUT } from "helpers/api_helper";
 import { useParams, useNavigate } from "react-router-dom";
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, NOTIFICATION_TITLES } from "helpers/errorMessages";
 import InputWithAddon from "components/Common/InputWithAddon";
@@ -27,7 +26,6 @@ const AddArea = () => {
   });
   const [branchLoader, setBranchLoader] = useState(false);
   const [lineLoader, setLineLoader] = useState(false);
-  const [selectedBranchName, setSelectedBranchName] = useState("");
   const [selectedLineName, setSelectedLineName] = useState("");
   const [form] = Form.useForm();
   const params = useParams();
@@ -50,7 +48,7 @@ const AddArea = () => {
     }
   }, [formData?.branch_id]);
 
-  // Fetch branch name from branch_dd API
+  // Fetch branch id from branch_dd API (hidden from UI, used for backend)
   const getBranchName = async () => {
     try {
       setBranchLoader(true);
@@ -69,7 +67,6 @@ const AddArea = () => {
         );
         
         if (matchedBranch) {
-          setSelectedBranchName(matchedBranch.branch_name);
           setFormData((prev) => ({
             ...prev,
             branch_id: parseInt(selectedBranchId),
@@ -160,12 +157,14 @@ const AddArea = () => {
 
       setLoader(false);
       
-      if (response.status >= 400) {
+      if (response.status === 400 || response.status >= 500) {
         notification.error({
           message: NOTIFICATION_TITLES.AREA,
-          description: params?.id 
-            ? ERROR_MESSAGES.AREA.UPDATE_FAILED 
-            : ERROR_MESSAGES.AREA.CREATE_FAILED,
+          description:
+            response?.data?.areaName?.[0] ||
+            (params.id
+              ? "Failed to update the area."
+              : "Failed to create the area"),
           duration: 0,
         });
         return;
@@ -214,10 +213,6 @@ const AddArea = () => {
     setFormData({ ...formData, ...allValues });
   };
 
-  // ── Derived state for line field ──────────────────────────────────────────
-  // Branch not yet loaded → disable and show spinner
-  // Branch loaded, lines loading → disable and show spinner
-  // Branch loaded, lines ready → enable and show ApartmentOutlined
   const isLineDisabled = branchLoader || !formData?.branch_id || lineLoader;
   const lineFieldIcon = (branchLoader || lineLoader)
     ? <Spin size="small" />
@@ -246,35 +241,8 @@ const AddArea = () => {
                 className="add-area-form"
               >
                 <div className="container add-area-form-container">
-                  {/* Branch and Line */}
+                  {/* Line */}
                   <div className="row mb-2">
-
-                    {/* ── Branch field ── */}
-                    <div className="col-md-6">
-                      <Form.Item
-                        label="Branch"
-                        rules={[
-                          {
-                            required: true,
-                            message: ERROR_MESSAGES.AREA.BRANCH_REQUIRED,
-                          },
-                        ]}
-                      >
-                        <InputWithAddon
-                          icon={branchLoader ? <Spin size="small" /> : <BankOutlined />}
-                          value={branchLoader ? "Loading..." : (selectedBranchName || "No branch selected")}
-                          placeholder="No branch selected"
-                          disabled
-                          style={{
-                            backgroundColor: '#f5f5f5',
-                            cursor: 'not-allowed',
-                            color: branchLoader ? '#999' : '#000',
-                          }}
-                        />
-                      </Form.Item>
-                    </div>
-
-                    {/* ── Line field ── */}
                     <div className="col-md-6">
                       {params.id ? (
                         // Edit mode — show line name as read-only text
@@ -295,7 +263,6 @@ const AddArea = () => {
                         </Form.Item>
                       ) : (
                         // Create mode — dropdown, disabled until branch is loaded
-                        // and shows spinner while branch or lines are loading
                         <Form.Item
                           label="Line"
                           name="line_id"
@@ -331,10 +298,7 @@ const AddArea = () => {
                       )}
                     </div>
 
-                  </div>
-
-                  {/* Area Name */}
-                  <div className="row mb-2">
+                    {/* Area Name */}
                     <div className="col-md-6">
                       <Form.Item
                         label="Area Name"

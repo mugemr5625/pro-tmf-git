@@ -22,12 +22,12 @@ const InvestmentTypeCollapseContent = ({ investmentType }) => {
           fontWeight: 600,
         }}
       >
-        <Descriptions.Item label="Branch Name:">
+        {/* <Descriptions.Item label="Branch Name:">
           {investmentType.branch_name || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Line Name:">
           {investmentType.line_name || "N/A"}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
         <Descriptions.Item label="Multi-User:">
           {investmentType.multi_user_allocation ? "Yes" : "No"}
         </Descriptions.Item>

@@ -1,13 +1,11 @@
 import ReloadOutlined from "@ant-design/icons/lib/icons/ReloadOutlined";
 import { Button, Form, Input, Select, notification, Spin, Space } from "antd";
 import { 
-  BankOutlined, 
   ApartmentOutlined, 
   FileTextOutlined,
   CalendarOutlined,
   DollarOutlined,
   CreditCardOutlined,
-  CommentOutlined
 } from '@ant-design/icons';
 import Loader from "components/Common/Loader";
 import PAYMENT_MODES_OPTIONS from "constants/payment_modes";
@@ -15,7 +13,6 @@ import { POST, PUT, GET } from "helpers/api_helper";
 import { getDetails } from "helpers/getters";
 import {
   EXPENSE_TRANSACTION,
-  EXPENSE_TYPES,
 } from "helpers/url_helper";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -33,133 +30,113 @@ const ExpenseTransactionForm = () => {
   const params = useParams();
 
   const [loading, setLoading] = useState(false);
-  const [branchList, setBranchList] = useState([]);
-  const [allLines, setAllLines] = useState([]);
-  const [filteredLines, setFilteredLines] = useState([]);
   const [expenseTypeList, setExpenseTypeList] = useState([]);
-  const [expenseTransaction, setExpenseTransaction] = useState(null);
-  const [branchLoader, setBranchLoader] = useState(false);
-  const [lineLoader, setLineLoader] = useState(false);
   const [expenseTypeLoader, setExpenseTypeLoader] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
+  const [selectedLineId, setSelectedLineId] = useState(null);
+  const [selectedLineName, setSelectedLineName] = useState("");
 
-  // Fetch branches from branch_dd API
-  const getBranchList = async () => {
-    try {
-      setBranchLoader(true);
-      const response = await GET("api/branch_dd");
-      if (response?.status === 200) {
-        setBranchList(response.data || []);
-      } else {
-        setBranchList([]);
+  // ─── Read branch + line from localStorage ────────────────────────────────
+  useEffect(() => {
+    // Branch
+    const storedBranchId = localStorage.getItem("selected_branch_id");
+    if (storedBranchId) {
+      try {
+        setSelectedBranchId(parseInt(JSON.parse(storedBranchId)));
+      } catch {
+        setSelectedBranchId(parseInt(storedBranchId));
       }
-      setBranchLoader(false);
-    } catch (error) {
-      setBranchList([]);
-      setBranchLoader(false);
-      console.log(error);
-      notification.error({
-        message: "Error",
-        description: "Failed to fetch branches.",
-        duration: 5,
-      });
     }
-  };
 
-  // Fetch lines from line_dd API
-  const getLineList = async () => {
-    try {
-      setLineLoader(true);
-      const response = await GET("api/line_dd");
-      if (response?.status === 200) {
-        setAllLines(response.data || []);
-      } else {
-        setAllLines([]);
+    // Line — set by ExpenseTransactionList search modal
+    const storedLineId = localStorage.getItem("selected_line_id");
+    const storedLineName = localStorage.getItem("selected_line_name");
+
+    if (storedLineId) {
+      const lineId = parseInt(storedLineId);
+      setSelectedLineId(lineId);
+      setSelectedLineName(storedLineName || "");
+      // Auto-fetch expense types on create mode
+      if (!params.id) {
+        getExpenseTypeList(lineId);
       }
-      setLineLoader(false);
-    } catch (error) {
-      setAllLines([]);
-      setLineLoader(false);
-      console.log(error);
-      notification.error({
-        message: "Error",
-        description: "Failed to fetch lines.",
-        duration: 5,
-      });
     }
-  };
+  }, []);
 
- const getExpenseTypeList = async () => {
-  try {
-    setExpenseTypeLoader(true);
-    const response = await GET(EXPENSE_TYPES);
-    if (response?.status === 200) {
-      // Fix: Access response.data.results for paginated response
-      const allExpenseTypes = response.data.results || response.data;
-      setExpenseTypeList(allExpenseTypes);
-    } else {
+  // ─── Fetch expense types by line_id ──────────────────────────────────────
+  const getExpenseTypeList = async (lineId) => {
+    try {
+      setExpenseTypeLoader(true);
       setExpenseTypeList([]);
+      form.setFieldsValue({ EXPNS_TYPE_ID: undefined });
+      const response = await GET(`/api/expensetype_dd/?line_id=${lineId}`);
+      if (response?.status === 200) {
+        const data = Array.isArray(response.data)
+          ? response.data
+          : response.data?.results || [];
+        setExpenseTypeList(data);
+      } else {
+        setExpenseTypeList([]);
+      }
+    } catch (error) {
+      setExpenseTypeList([]);
+      console.log(error);
+      notification.error({
+        message: "Error",
+        description: "Failed to fetch expense types.",
+        duration: 5,
+      });
+    } finally {
+      setExpenseTypeLoader(false);
     }
-    setExpenseTypeLoader(false);
-  } catch (error) {
-    setExpenseTypeList([]);
-    setExpenseTypeLoader(false);
-    console.log(error);
-    notification.error({
-      message: "Error",
-      description: "Failed to fetch expense types.",
-      duration: 5,
-    });
-  }
-};
+  };
 
+  // ─── Load edit details ────────────────────────────────────────────────────
   const getExpenseTransactionDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getDetails(EXPENSE_TRANSACTION, params.id);
       if (response) {
-        setExpenseTransaction(response);
-        form.setFieldsValue(response);
-        
-        // Set selected branch and filter lines if editing
-        if (response.branch_id) {
-          setSelectedBranchId(response.branch_id);
-          
-          // Filter lines for the selected branch
-          const branchLines = allLines.filter(
-            line => line.branch_id === response.branch_id
+        // In edit mode, prefer line from saved record
+        if (response.line_id) {
+          setSelectedLineId(response.line_id);
+          setSelectedLineName(
+            response.line_name || localStorage.getItem("selected_line_name") || ""
           );
-          setFilteredLines(branchLines);
+          await getExpenseTypeList(response.line_id);
         }
+        form.setFieldsValue(response);
       }
-      setLoading(false);
     } catch (error) {
-      setLoading(false);
       console.log(error);
+    } finally {
+      setLoading(false);
     }
-  }, [params.id, form, allLines]);
+  }, [params.id, form]);
 
   useEffect(() => {
-    getBranchList();
-    getLineList();
-    getExpenseTypeList();
-  }, []);
-
-  useEffect(() => {
-    if (params.id && allLines.length > 0) {
+    if (params.id && selectedBranchId) {
       getExpenseTransactionDetails();
     }
-  }, [params.id, allLines, getExpenseTransactionDetails]);
+  }, [params.id, selectedBranchId]);
 
+  // ─── Submit ───────────────────────────────────────────────────────────────
   const onFinish = async (values) => {
     setLoading(true);
     try {
+      const payload = {
+        ...values,
+        line_id: selectedLineId,
+        branch_id: selectedBranchId,
+      };
+
       let response;
       if (params.id) {
-        response = await PUT(`${EXPENSE_TRANSACTION}${params.id}/`, values);
+        response = await PUT(`${EXPENSE_TRANSACTION}${params.id}/`, payload);
       } else {
-        response = await POST(EXPENSE_TRANSACTION, values);
+        response = await POST(EXPENSE_TRANSACTION, payload);
       }
+
       if (response?.status === 200 || response?.status === 201) {
         const selectedExpenseType = expenseTypeList?.find(
           (type) => type.id === values.EXPNS_TYPE_ID
@@ -174,9 +151,19 @@ const ExpenseTransactionForm = () => {
           duration: 0,
         });
         navigate("/expense-transaction");
-      } else {
+      } else if (response?.status === 400 || response?.status >= 500) {
+        const errData = response?.data || {};
+        const errMsg =
+          errData.line_id?.[0] ||
+          errData.EXPNS_TYPE_ID?.[0] ||
+          errData.detail ||
+          Object.values(errData).flat().join(", ") ||
+          (params.id
+            ? "Failed to update the expense transaction. Please try again."
+            : "Failed to create the expense transaction. Please try again.");
         notification.error({
           message: `Failed to ${params.id ? "update" : "add"} expense transaction`,
+          description: errMsg,
           duration: 0,
         });
       }
@@ -192,23 +179,8 @@ const ExpenseTransactionForm = () => {
     }
   };
 
- const onValuesChange = (changedValues) => {
-  if ('branch_id' in changedValues) {          // ← key check instead of value check
-    const newBranchId = changedValues.branch_id ?? null;
-    setSelectedBranchId(newBranchId);
-
-    if (newBranchId && allLines.length > 0) {
-      const branchLines = allLines.filter(
-        (line) => line.branch_id === newBranchId
-      );
-      setFilteredLines(branchLines);
-    } else {
-      setFilteredLines([]);                    // ← clears lines when branch removed
-    }
-
-    form.setFieldsValue({ line_id: undefined }); // ← resets line selection
-  }
-};
+  // ─── Derived state ────────────────────────────────────────────────────────
+  const isExpenseTypeDisabled = expenseTypeLoader || !selectedLineId;
 
   return (
     <>
@@ -228,84 +200,27 @@ const ExpenseTransactionForm = () => {
                 form={form}
                 layout="vertical"
                 onFinish={onFinish}
-                onValuesChange={onValuesChange}
                 className="expense-transaction-form"
               >
                 <div className="container expense-transaction-form-container">
-                  {/* Branch and Line Name */}
+
+                  {/* Row 1: Line Name (disabled, from localStorage) + Expense Type */}
                   <div className="row mb-2">
                     <div className="col-md-6">
-                      <Form.Item
-                        label="Branch Name"
-                        name="branch_id"
-                        rules={[
-                          { required: true, message: "Please select a branch" },
-                        ]}
-                      >
-                       <SelectWithAddon
-  icon={branchLoader ? <Spin size="small" /> : <BankOutlined />}
-  placeholder={branchLoader ? "Loading branches..." : "Select Branch"}
-  allowClear
-  showSearch
-  size="large"
-  disabled={branchLoader}
-  filterOption={(input, option) =>
-    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-  }
->
-  {branchList.map((branch) => (
-    <Option key={branch.id} value={branch.id}>
-      {branch.branch_name}
-    </Option>
-  ))}
-</SelectWithAddon>
+                      <Form.Item label="Line Name">
+                        <InputWithAddon
+                          icon={<ApartmentOutlined />}
+                          value={selectedLineName || "No line selected"}
+                          disabled
+                          style={{
+                            backgroundColor: '#f5f5f5',
+                            cursor: 'not-allowed',
+                            color: selectedLineName ? '#000' : '#999',
+                          }}
+                        />
                       </Form.Item>
                     </div>
 
-                    <div className="col-md-6">
-                      <Form.Item
-                        label="Line Name"
-                        name="line_id"
-                        rules={[
-                          { required: true, message: "Please select a line" },
-                        ]}
-                      >
-                       <SelectWithAddon
-  icon={lineLoader ? <Spin size="small" /> : <ApartmentOutlined />}
-  placeholder={
-    branchLoader
-      ? "Loading branches..."
-      : lineLoader
-      ? "Loading lines..."
-      : !selectedBranchId
-      ? "Select a branch first"
-      : "Select Line"
-  }
-  allowClear
-  showSearch
-  size="large"
-  disabled={!selectedBranchId || lineLoader}
-  style={{
-    backgroundColor: (!selectedBranchId || lineLoader) ? '#f5f5f5' : undefined,
-    cursor: (!selectedBranchId || lineLoader) ? 'not-allowed' : undefined,
-    opacity: 1,
-  }}
-  filterOption={(input, option) =>
-    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-  }
->
-  {filteredLines.map((line) => (
-    <Option key={line.line_id} value={line.line_id}>
-      {line.line_name}
-    </Option>
-  ))}
-</SelectWithAddon>
-                      </Form.Item>
-                    </div>
-                  </div>
-
-                  {/* Expense Type and Date */}
-                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Expense Type Name"
@@ -318,25 +233,36 @@ const ExpenseTransactionForm = () => {
                         ]}
                       >
                         <SelectWithAddon
-  icon={expenseTypeLoader ? <Spin size="small" /> : <FileTextOutlined />}
-  placeholder={expenseTypeLoader ? "Loading expense types..." : "Select Expense Type"}
-  allowClear
-  showSearch
-  size="large"
-  disabled={expenseTypeLoader}
-  filterOption={(input, option) =>
-    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-  }
->
-  {expenseTypeList?.map((type) => (
-    <Option key={type.id} value={type.id}>
-      {type.name}
-    </Option>
-  ))}
-</SelectWithAddon>
+                          icon={expenseTypeLoader ? <Spin size="small" /> : <FileTextOutlined />}
+                          placeholder={
+                            expenseTypeLoader
+                              ? "Loading expense types..."
+                              : !selectedLineId
+                              ? "No line selected"
+                              : expenseTypeList.length === 0
+                              ? "No expense types available"
+                              : "Select Expense Type"
+                          }
+                          allowClear
+                          showSearch
+                          size="large"
+                          disabled={isExpenseTypeDisabled}
+                          filterOption={(input, option) =>
+                            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                          }
+                        >
+                          {expenseTypeList?.map((type) => (
+                            <Option key={type.id} value={type.id}>
+                              {type.name}
+                            </Option>
+                          ))}
+                        </SelectWithAddon>
                       </Form.Item>
                     </div>
+                  </div>
 
+                  {/* Row 2: Date + Expense Amount */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Date of Expense Transaction"
@@ -347,22 +273,19 @@ const ExpenseTransactionForm = () => {
                       >
                         <InputWithAddon
                           icon={<CalendarOutlined />}
-                          type="date" 
+                          type="date"
                           autoComplete="off"
                           onPaste={(e) => e.preventDefault()}
                           onCopy={(e) => e.preventDefault()}
                           onCut={(e) => e.preventDefault()}
                           onContextMenu={(e) => e.preventDefault()}
                           onDrop={(e) => e.preventDefault()}
-                          size="large" 
+                          size="large"
                           allowClear
                         />
                       </Form.Item>
                     </div>
-                  </div>
 
-                  {/* Amount and Payment Mode */}
-                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Expense Amount"
@@ -382,22 +305,22 @@ const ExpenseTransactionForm = () => {
                           inputMode="decimal"
                           onValueFilter={(value) => {
                             let filtered = value.replace(/[^0-9.]/g, '');
-                            
                             const parts = filtered.split('.');
                             if (parts.length > 2) {
                               filtered = parts[0] + '.' + parts.slice(1).join('');
                             }
-                            
                             if (parts.length === 2 && parts[1].length > 2) {
                               filtered = parts[0] + '.' + parts[1].slice(0, 2);
                             }
-                            
                             return filtered;
                           }}
                         />
                       </Form.Item>
                     </div>
+                  </div>
 
+                  {/* Row 3: Payment Mode + Remarks */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Payment Mode"
@@ -411,7 +334,7 @@ const ExpenseTransactionForm = () => {
                       >
                         <SelectWithAddon
                           icon={<CreditCardOutlined />}
-                          placeholder="Select Payment Mode" 
+                          placeholder="Select Payment Mode"
                           allowClear
                           size="large"
                         >
@@ -423,17 +346,14 @@ const ExpenseTransactionForm = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
-                  </div>
 
-                  {/* Remarks */}
-                  <div className="row mb-2">
-                    <div className="col-md-12">
+                    <div className="col-md-6">
                       <Form.Item
                         label="Remarks / Comments"
                         name="EXPNS_TRNSCTN_RMRK"
                       >
-                        <Input.TextArea 
-                          placeholder="Enter remarks or comments" 
+                        <Input.TextArea
+                          placeholder="Enter remarks or comments"
                           autoSize={{ minRows: 2, maxRows: 6 }}
                           size="large"
                           allowClear
@@ -448,7 +368,6 @@ const ExpenseTransactionForm = () => {
                       <Button type="primary" htmlType="submit" size="large">
                         {params.id ? "Update Transaction" : "Add Transaction"}
                       </Button>
-
                       <Button
                         size="large"
                         onClick={() => navigate("/expense-transaction")}
@@ -457,6 +376,7 @@ const ExpenseTransactionForm = () => {
                       </Button>
                     </Space>
                   </div>
+
                 </div>
               </Form>
             </div>

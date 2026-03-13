@@ -22,7 +22,7 @@ const ExpenseTransactionCollapseContent = ({ expense }) => {
           fontWeight: 600,
         }}
       >
-        <Descriptions.Item label="Branch :">
+        {/* <Descriptions.Item label="Branch :">
           {expense.EXPNS_TRNSCTN_BRNCH_NM || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Line :">
@@ -30,7 +30,7 @@ const ExpenseTransactionCollapseContent = ({ expense }) => {
         </Descriptions.Item>
         <Descriptions.Item label="Expense :">
           {expense.EXPNS_TYPE_NM || "N/A"}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
         <Descriptions.Item label="Amount :">
           {expense.EXPNS_TRNSCTN_AMNT ? `₹${expense.EXPNS_TRNSCTN_AMNT}` : "N/A"}
         </Descriptions.Item>

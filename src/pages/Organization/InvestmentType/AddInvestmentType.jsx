@@ -4,7 +4,6 @@ import { POST, PUT, GET } from "helpers/api_helper";
 import { Fragment, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  BankOutlined,
   ApartmentOutlined,
   UserOutlined,
   TagOutlined,
@@ -28,19 +27,15 @@ const AddInvestmentType = () => {
   const [lineList, setLineList] = useState([]);
   const [lineLoading, setLineLoading] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
-  const [selectedBranchName, setSelectedBranchName] = useState("");
   const [multiUserAllocation, setMultiUserAllocation] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
-  
 
   // ── On mount ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       setLoading(true);
 
-      // Read branch from localStorage
       const storedBranchId = localStorage.getItem("selected_branch_id");
-      const storedBranchName = localStorage.getItem("selected_branch_name");
 
       if (!storedBranchId) {
         notification.warning({
@@ -58,16 +53,7 @@ const AddInvestmentType = () => {
         branchId = storedBranchId;
       }
 
-      let branchName;
-      try {
-        branchName = JSON.parse(storedBranchName);
-        branchName = branchName?.branch_name || branchName?.name || branchName;
-      } catch {
-        branchName = storedBranchName;
-      }
-
       setSelectedBranchId(branchId);
-      setSelectedBranchName(branchName || "");
 
       await Promise.all([fetchUsers(), fetchLines(branchId)]);
 
@@ -79,8 +65,8 @@ const AddInvestmentType = () => {
             const data = res.data;
             setMultiUserAllocation(data.multi_user_allocation);
             form.setFieldsValue({
-              investment_title: data.investment_title,
               line: data.line,
+              investment_title: data.investment_title,
               entitled_to: data.entitled_to,
               multi_user_allocation: data.multi_user_allocation,
             });
@@ -98,22 +84,22 @@ const AddInvestmentType = () => {
 
   // ── API helpers ───────────────────────────────────────────────────────────
 
- const fetchUsers = async () => {
-  try {
-    setUserLoading(true);
-    const res = await GET("/api/users/");
-    if (res?.status === 200) {
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data?.results || [];
-      setUserList(data);
+  const fetchUsers = async () => {
+    try {
+      setUserLoading(true);
+      const res = await GET("/api/users/");
+      if (res?.status === 200) {
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.results || [];
+        setUserList(data);
+      }
+    } catch {
+      setUserList([]);
+    } finally {
+      setUserLoading(false);
     }
-  } catch {
-    setUserList([]);
-  } finally {
-    setUserLoading(false);
-  }
-};
+  };
 
   const fetchLines = async (branchId) => {
     try {
@@ -160,22 +146,23 @@ const AddInvestmentType = () => {
             : "Investment type has been created successfully.",
         });
         navigate("/investment-type");
-      } else {
-        // Surface backend validation errors
+      } else if (response?.status === 400 || response?.status >= 500) {
         const errData = response?.data || {};
         const errMsg =
-          errData.branch_id?.[0] ||
-          errData.line_id?.[0] ||
+          errData.investment_title?.[0] ||
+          errData.line?.[0] ||
           errData.detail ||
           Object.values(errData).flat().join(", ") ||
-          "Please try again.";
+          (params.id
+            ? "Failed to update the investment type. Please try again."
+            : "Failed to create the investment type. Please try again.");
         notification.error({ message: "Operation Failed", description: errMsg });
       }
     } catch (error) {
       const errData = error?.response?.data || {};
       const errMsg =
-        errData.branch_id?.[0] ||
-        errData.line_id?.[0] ||
+        errData.investment_title?.[0] ||
+        errData.line?.[0] ||
         errData.detail ||
         Object.values(errData).flat().join(", ") ||
         "An unexpected error occurred.";
@@ -210,8 +197,34 @@ const AddInvestmentType = () => {
               >
                 <div className="container add-inv-type-form-container">
 
-                  {/* Row 1 – Title & Branch (read-only) */}
+                  {/* Row 1 – Line Name & Investment Title */}
                   <div className="row mb-2">
+                    <div className="col-md-6">
+                      <Form.Item
+                        label="Line Name"
+                        name="line"
+                        rules={[{ required: true, message: "Please select a line" }]}
+                      >
+                        <SelectWithAddon
+                          icon={lineLoading ? <Spin size="small" /> : <ApartmentOutlined />}
+                          placeholder={lineLoading ? "Loading lines…" : "Select Line"}
+                          allowClear
+                          showSearch
+                          size="large"
+                          disabled={lineLoading}
+                          filterOption={(input, option) =>
+                            option.children.toLowerCase().includes(input.toLowerCase())
+                          }
+                        >
+                          {lineList.map((line) => (
+                            <Option key={line.line_id} value={line.line_id}>
+                              {line.line_name}
+                            </Option>
+                          ))}
+                        </SelectWithAddon>
+                      </Form.Item>
+                    </div>
+
                     <div className="col-md-6">
                       <Form.Item
                         label="Investment Title"
@@ -243,49 +256,10 @@ const AddInvestmentType = () => {
                         />
                       </Form.Item>
                     </div>
-
-                    <div className="col-md-6">
-                      {/* Branch – derived from localStorage, display-only */}
-                      <Form.Item label="Branch Name">
-                        <InputWithAddon
-                          icon={<BankOutlined />}
-                          value={selectedBranchName}
-                          disabled
-                          size="large"
-                          placeholder="Branch (from session)"
-                        />
-                      </Form.Item>
-                    </div>
                   </div>
 
-                  {/* Row 2 – Line & Multi-User */}
+                  {/* Row 2 – Multi-User Allocation & Entitled To */}
                   <div className="row mb-2">
-                    <div className="col-md-6">
-                     <Form.Item
-  label="Line Name"
-  name="line"
-  rules={[{ required: true, message: "Please select a line" }]}
->
-  <SelectWithAddon
-    icon={lineLoading ? <Spin size="small" /> : <ApartmentOutlined />}
-    placeholder={lineLoading ? "Loading lines…" : "Select Line"}
-    allowClear
-    showSearch
-    size="large"
-    disabled={lineLoading}
-    filterOption={(input, option) =>
-      option.children.toLowerCase().includes(input.toLowerCase())
-    }
-  >
-    {lineList.map((line) => (
-      <Option key={line.line_id} value={line.line_id}>
-        {line.line_name}
-      </Option>
-    ))}
-  </SelectWithAddon>
-</Form.Item>
-                    </div>
-
                     <div className="col-md-6">
                       <Form.Item
                         label="Multi-User Allocation"
@@ -304,37 +278,34 @@ const AddInvestmentType = () => {
                         />
                       </Form.Item>
                     </div>
-                  </div>
 
-                  {/* Row 3 – Entitled To (only when multi_user_allocation = false) */}
-                  {!multiUserAllocation && (
-                    <div className="row mb-2">
+                    {!multiUserAllocation && (
                       <div className="col-md-6">
                         <Form.Item
-  label="Entitled To"
-  name="entitled_to"
->
-  <SelectWithAddon
-    icon={userLoading ? <Spin size="small" /> : <UserOutlined />}
-    placeholder={userLoading ? "Loading users…" : "Select User"}
-    allowClear
-    showSearch
-    size="large"
-    disabled={userLoading}
-    filterOption={(input, option) =>
-      option.children.toLowerCase().includes(input.toLowerCase())
-    }
-  >
-    {userList.map((user) => (
-      <Option key={user.id} value={user.id}>
-        {user.full_name ? `${user.full_name} | ${user.username}` : user.username}
-      </Option>
-    ))}
-  </SelectWithAddon>
-</Form.Item>
+                          label="Entitled To"
+                          name="entitled_to"
+                        >
+                          <SelectWithAddon
+                            icon={userLoading ? <Spin size="small" /> : <UserOutlined />}
+                            placeholder={userLoading ? "Loading users…" : "Select User"}
+                            allowClear
+                            showSearch
+                            size="large"
+                            disabled={userLoading}
+                            filterOption={(input, option) =>
+                              option.children.toLowerCase().includes(input.toLowerCase())
+                            }
+                          >
+                            {userList.map((user) => (
+                              <Option key={user.id} value={user.id}>
+                                {user.full_name ? `${user.full_name} | ${user.username}` : user.username}
+                              </Option>
+                            ))}
+                          </SelectWithAddon>
+                        </Form.Item>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Buttons */}
                   <div className="text-center mt-4">

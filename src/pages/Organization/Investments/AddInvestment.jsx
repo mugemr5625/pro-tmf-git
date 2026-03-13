@@ -9,7 +9,6 @@ import { Fragment, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import {
-  BankOutlined,
   ApartmentOutlined,
   DollarOutlined,
   CreditCardOutlined,
@@ -22,7 +21,7 @@ import "./AddInvestment.css";
 
 const { Option } = Select;
 
-const INVESTMENT_TYPES_API = "/api/investmenttypes/";
+const INVESTMENT_TYPES_DD_API = "/api/investmenttype_dd/";
 
 const AddInvestment = () => {
   const [form] = Form.useForm();
@@ -30,52 +29,51 @@ const AddInvestment = () => {
   const params = useParams();
 
   const [loading, setLoading] = useState(true);
-  const [branchList, setBranchList] = useState(null);
-  const [lineList, setLineList] = useState(null);
-  const [allLines, setAllLines] = useState(null);
+  const [lineList, setLineList] = useState([]);
   const [investmentTitles, setInvestmentTitles] = useState([]);
   const [investment, setInvestment] = useState(null);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
 
-  // ─── Loading states ───────────────────────────────────────────────────────
-  const [branchLoading, setBranchLoading] = useState(false);
+  // ── Pre-selected line from localStorage (used in add mode only) ───────────
+  const [preselectedLineId, setPreselectedLineId] = useState(null);
+
+  // ── Loading states ────────────────────────────────────────────────────────
   const [lineLoading, setLineLoading] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
 
-  // ─── Fetch branch from localStorage + branch_dd ───────────────────────────
-  const getBranchName = async () => {
-    setBranchLoading(true);
+  // ── Fetch branch id and saved line id from localStorage ───────────────────
+  const getBranchId = async () => {
     try {
       const storedBranchId = localStorage.getItem("selected_branch_id");
-      if (!storedBranchId) { setBranchLoading(false); return; }
+      const storedLineId = localStorage.getItem("selected_line_id");
 
-      const response = await GET("api/branch_dd");
-      if (response?.status === 200 && response?.data) {
-        setBranchList(response.data);
-        const matchedBranch = response.data.find(
-          (branch) => branch.id === parseInt(storedBranchId)
-        );
-        if (matchedBranch) {
-          setSelectedBranchId(matchedBranch.id); // already an int from API
-        }
+      if (!storedBranchId) return;
+
+      let branchId;
+      try {
+        branchId = JSON.parse(storedBranchId);
+      } catch {
+        branchId = storedBranchId;
+      }
+
+      setSelectedBranchId(parseInt(branchId));
+
+      // Only pre-select line in add mode
+      if (!params.id && storedLineId) {
+        setPreselectedLineId(parseInt(storedLineId));
       }
     } catch (error) {
-      console.error("Error fetching branch data:", error);
-      notification.error({ message: "Error", description: "Failed to fetch branch information." });
-    } finally {
-      setBranchLoading(false);
+      console.error("Error reading from localStorage:", error);
     }
   };
 
-  // ─── Fetch lines by branch_id ─────────────────────────────────────────────
+  // ── Fetch lines by branch_id ──────────────────────────────────────────────
   const getLineList = async (branchId) => {
     setLineLoading(true);
     try {
       const response = await GET(`api/line_dd/?branch_id=${branchId}`);
       if (response?.status === 200 && response?.data) {
-        const lines = Array.isArray(response.data) ? response.data : [];
-        setAllLines(lines);
-        setLineList(lines);
+        setLineList(Array.isArray(response.data) ? response.data : []);
       }
     } catch (error) {
       console.error("Error fetching line data:", error);
@@ -85,13 +83,15 @@ const AddInvestment = () => {
     }
   };
 
-  // ─── Fetch investment titles ──────────────────────────────────────────────
-  const getInvestmentTitles = async () => {
+  // ── Fetch investment titles by line_id ────────────────────────────────────
+  const getInvestmentTitles = async (lineId) => {
     setTitleLoading(true);
+    setInvestmentTitles([]);
+    form.setFieldsValue({ investment_title_id: undefined });
     try {
-      const response = await GET(INVESTMENT_TYPES_API);
+      const response = await GET(`${INVESTMENT_TYPES_DD_API}?line_id=${lineId}`);
       if (response?.status === 200) {
-        const results = response.data?.results || response.data || [];
+        const results = Array.isArray(response.data) ? response.data : response.data?.results || [];
         setInvestmentTitles(results);
       }
     } catch (error) {
@@ -102,11 +102,19 @@ const AddInvestment = () => {
     }
   };
 
-  // ─── Lifecycle ────────────────────────────────────────────────────────────
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    getBranchName();
-    getInvestmentTitles();
-  }, []);
+    const init = async () => {
+      await getBranchId();
+      if (params.id) {
+        const res = await getDetails(INVESTMENT, params.id);
+        setInvestment(res);
+      } else {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [params.id]);
 
   useEffect(() => {
     if (selectedBranchId) {
@@ -114,41 +122,43 @@ const AddInvestment = () => {
     }
   }, [selectedBranchId]);
 
+  // ── Auto-fill line from localStorage when lines are loaded (add mode only) ─
   useEffect(() => {
-    if (params.id) {
-      getDetails(INVESTMENT, params.id).then((res) => {
-        setInvestment(res);
-      });
+    if (!params.id && preselectedLineId && lineList.length > 0) {
+      const lineExists = lineList.some(l => l.line_id === preselectedLineId);
+      if (lineExists) {
+        form.setFieldsValue({ line: preselectedLineId });
+        getInvestmentTitles(preselectedLineId);
+      }
     }
-  }, [params.id]);
+  }, [preselectedLineId, lineList]);
 
-  // Set form values once all data is ready
+  // ── Set form values when editing ──────────────────────────────────────────
   useEffect(() => {
-    if (
-      branchList != null &&
-      allLines != null &&
-      (params.id == null || investment != null)
-    ) {
-      if (investment && investment.branch) {
-        setSelectedBranchId(investment.branch);
-        const filteredLines = allLines.filter(
-          (line) => line.branch_id === investment.branch
-        );
-        setLineList(filteredLines);
-        setTimeout(() => {
+    if (params.id && investment) {
+      const lineId = investment.line;
+      if (lineId) {
+        getInvestmentTitles(lineId).then(() => {
           form.setFieldsValue(investment);
           setLoading(false);
-        }, 100);
+        });
       } else {
-        if (selectedBranchId) {
-          form.setFieldsValue({ branch: selectedBranchId });
-        }
+        form.setFieldsValue(investment);
         setLoading(false);
       }
     }
-  }, [branchList, allLines, params.id, investment, form, selectedBranchId]);
+  }, [investment]);
 
-  // ─── Submit ───────────────────────────────────────────────────────────────
+  // ── Handle line change (manual selection) ─────────────────────────────────
+  const handleLineChange = (lineId) => {
+    form.setFieldsValue({ investment_title_id: undefined });
+    setInvestmentTitles([]);
+    if (lineId) {
+      getInvestmentTitles(lineId);
+    }
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   const onFinish = async (values) => {
     setLoading(true);
     try {
@@ -182,37 +192,42 @@ const AddInvestment = () => {
             : SUCCESS_MESSAGES.INVESTMENT.CREATED,
         });
         navigate("/investment");
-      } else {
+      } else if (response?.status === 400 || response?.status >= 500) {
+        const errData = response?.data || {};
+        const errMsg =
+          errData.investment_title_id?.[0] ||
+          errData.line?.[0] ||
+          errData.detail ||
+          Object.values(errData).flat().join(", ") ||
+          (params.id
+            ? "Failed to update the investment. Please try again."
+            : "Failed to create the investment. Please try again.");
         notification.error({
           message: params.id
             ? ERROR_MESSAGES.INVESTMENT.UPDATE_FAILED
             : ERROR_MESSAGES.INVESTMENT.ADD_FAILED,
-          description: response?.message || response?.data?.message || "Please try again",
+          description: errMsg,
         });
       }
     } catch (error) {
       console.error("Submit error:", error);
       notification.error({
         message: ERROR_MESSAGES.INVESTMENT.OPERATION_ERROR,
-        description: error?.message || "An error occurred",
+        description: error?.message || "An unexpected error occurred.",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Derived: branch display name ─────────────────────────────────────────
-  const branchDisplayName = branchLoading
-    ? "Loading..."
-    : branchList?.find((b) => b.id === selectedBranchId)?.branch_name || "No branch selected";
+  // ── Derived: line field state ─────────────────────────────────────────────
+  const isLineDisabled = lineLoading || !selectedBranchId;
+  const lineFieldIcon = lineLoading ? <Spin size="small" /> : <ApartmentOutlined />;
 
-  // ─── Derived: line field state ────────────────────────────────────────────
-  const isLineDisabled = branchLoading || lineLoading || !selectedBranchId;
-  const lineFieldIcon = branchLoading || lineLoading
-    ? <Spin size="small" />
-    : <ApartmentOutlined />;
+  // In add mode, if a line was saved in localStorage — lock the field
+  const isLinePreselected = !params.id && !!preselectedLineId;
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Fragment>
       {loading && <Loader />}
@@ -235,71 +250,7 @@ const AddInvestment = () => {
               >
                 <div className="container add-investment-form-container">
 
-                  {/* Row 1: Investment Title + Branch */}
-                  <div className="row mb-2">
-
-                    {/* ── Investment Title ── */}
-                    <div className="col-md-6">
-                      <Form.Item
-                        label="Investment Title"
-                        name="investment_title_id"
-                        rules={[
-                          { required: true, message: "Please select an investment title" },
-                        ]}
-                      >
-                        <SelectWithAddon
-                          icon={titleLoading ? <Spin size="small" /> : <DollarOutlined />}
-                          placeholder={titleLoading ? "Loading titles..." : "Select Investment Title"}
-                          allowClear
-                          showSearch
-                          size="large"
-                          disabled={titleLoading}
-                          filterOption={(input, option) =>
-                            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                          }
-                        >
-                          {investmentTitles.map((title) => (
-                            <Option key={title.id} value={title.id}>
-                              {title.investment_title}
-                            </Option>
-                          ))}
-                        </SelectWithAddon>
-                      </Form.Item>
-                    </div>
-
-                    {/* ── Branch — preselected, read-only ── */}
-                    {/* ── Branch — preselected, read-only ── */}
-<div className="col-md-6">
-  {/* Hidden field keeps the branch ID in the form store for validation */}
-  <Form.Item
-    name="branch"
-    rules={[
-      { required: true, message: ERROR_MESSAGES.INVESTMENT.BRANCH_REQUIRED },
-    ]}
-    style={{ display: "none" }}
-  >
-    <Input type="hidden" />
-  </Form.Item>
-
-  {/* Visual display — NOT controlled by Form, so branchDisplayName always wins */}
-  <Form.Item label="Branch Name">
-    <InputWithAddon
-      icon={branchLoading ? <Spin size="small" /> : <BankOutlined />}
-      value={branchDisplayName}
-      placeholder="No branch selected"
-      disabled
-      style={{
-        backgroundColor: '#f5f5f5',
-        cursor: 'not-allowed',
-        color: branchLoading ? '#999' : '#000',
-      }}
-    />
-  </Form.Item>
-</div>
-
-                  </div>
-
-                  {/* Row 2: Line + Investment Amount */}
+                  {/* Row 1: Line Name + Investment Title */}
                   <div className="row mb-2">
 
                     {/* ── Line ── */}
@@ -314,18 +265,18 @@ const AddInvestment = () => {
                         <SelectWithAddon
                           icon={lineFieldIcon}
                           placeholder={
-                            branchLoading
-                              ? "Loading branch..."
-                              : lineLoading
+                            lineLoading
                               ? "Loading lines..."
                               : !selectedBranchId
-                              ? "Select a branch first"
+                              ? "No branch selected"
                               : "Select Line"
                           }
-                          allowClear
+                          allowClear={!isLinePreselected}
                           showSearch
                           size="large"
-                          disabled={isLineDisabled}
+                          // Disable if: lines still loading, no branch, OR line is pre-filled from localStorage
+                          disabled={isLineDisabled || isLinePreselected}
+                          onChange={handleLineChange}
                           filterOption={(input, option) =>
                             option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
                           }
@@ -338,6 +289,48 @@ const AddInvestment = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
+
+                    {/* ── Investment Title ── */}
+                    <div className="col-md-6">
+                      <Form.Item
+                        label="Investment Title"
+                        name="investment_title_id"
+                        rules={[
+                          { required: true, message: "Please select an investment title" },
+                        ]}
+                      >
+                        <SelectWithAddon
+                          icon={titleLoading ? <Spin size="small" /> : <DollarOutlined />}
+                          placeholder={
+                            titleLoading
+                              ? "Loading titles..."
+                              : !form.getFieldValue("line")
+                              ? "Select a line first"
+                              : investmentTitles.length === 0
+                              ? "No titles available"
+                              : "Select Investment Title"
+                          }
+                          allowClear
+                          showSearch
+                          size="large"
+                          disabled={titleLoading || !form.getFieldValue("line")}
+                          filterOption={(input, option) =>
+                            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                          }
+                        >
+                          {investmentTitles.map((title) => (
+                            <Option key={title.id} value={title.id}>
+                              {title.investment_title}
+                            </Option>
+                          ))}
+                        </SelectWithAddon>
+                      </Form.Item>
+                    </div>
+
+                  </div>
+
+                  {/* Row 2: Investment Amount + Payment Mode */}
+                  <div className="row mb-2">
 
                     {/* ── Investment Amount ── */}
                     <div className="col-md-6">
@@ -364,11 +357,6 @@ const AddInvestment = () => {
                       </Form.Item>
                     </div>
 
-                  </div>
-
-                  {/* Row 3: Payment Mode + Date */}
-                  <div className="row mb-2">
-
                     {/* ── Payment Mode ── */}
                     <div className="col-md-6">
                       <Form.Item
@@ -392,6 +380,11 @@ const AddInvestment = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
+
+                  </div>
+
+                  {/* Row 3: Date of Investment */}
+                  <div className="row mb-2">
 
                     {/* ── Date ── */}
                     <div className="col-md-6">

@@ -32,15 +32,15 @@ const InvestmentCollapseContent = ({ investment }) => {
           fontWeight: 600,
         }}
       >
-        <Descriptions.Item label="Branch Name:">
+        {/* <Descriptions.Item label="Branch Name:">
           {investment.branch_name || "N/A"}
         </Descriptions.Item>
         <Descriptions.Item label="Line Name:">
           {investment.line_name || "N/A"}
-        </Descriptions.Item>
-        <Descriptions.Item label="User Name:">
+        </Descriptions.Item> */}
+        {/* <Descriptions.Item label="User Name:">
           {investment.user_name || "N/A"}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
         <Descriptions.Item label="Investment Amount:">
           {investment.investment_amount ? `₹${investment.investment_amount}` : "N/A"}
         </Descriptions.Item>
@@ -52,7 +52,7 @@ const InvestmentCollapseContent = ({ investment }) => {
         </Descriptions.Item>
         {investment.comments && (
           <Descriptions.Item label="Comments:" span={{ xs: 1, sm: 2, md: 3 }}>
-            {investment.comments}
+            {investment.comments || "N/A"}
           </Descriptions.Item>
         )}
       </Descriptions>

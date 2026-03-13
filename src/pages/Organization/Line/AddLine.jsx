@@ -11,7 +11,6 @@ import InputWithAddon from "components/Common/InputWithAddon";
 import SelectWithAddon from "components/Common/SelectWithAddon";
 
 import { 
-  BankOutlined, 
   ApartmentOutlined, 
   ClockCircleOutlined,
   CalendarOutlined, 
@@ -30,7 +29,6 @@ const AddLine = () => {
     installment: null,
     badinstallment: null,
   });
-  const [selectedBranchName, setSelectedBranchName] = useState("");
   const [branchLoader, setBranchLoader] = useState(false);
   const [form] = Form.useForm();
   const params = useParams();
@@ -50,13 +48,11 @@ const AddLine = () => {
       const response = await GET("api/branch_dd");
       
       if (response?.status === 200 && response?.data) {
-        // Find the branch that matches the selected_branch_id
         const matchedBranch = response.data.find(
           branch => branch.id === parseInt(selectedBranchId)
         );
         
         if (matchedBranch) {
-          setSelectedBranchName(matchedBranch.branch_name || matchedBranch.branchName);
           setFormData((prev) => ({
             ...prev,
             branch: selectedBranchId,
@@ -117,12 +113,14 @@ const AddLine = () => {
         : await POST(LINE, formData);
       
       setLoader(false);
-      if (response.status === 400) {
+      if (response.status === 400 || response.status >= 500) {
         notification.error({
           message: "Line",
           description:
             response?.data?.lineName?.[0] ||
-            (params.id ? ERROR_MESSAGES.LINE.UPDATE_FAILED : ERROR_MESSAGES.LINE.CREATE_FAILED),
+            (params.id
+              ? "Failed to update the line. Please try again."
+              : "Failed to create the line. Please try again."),
           duration: 0,
         });
         return;
@@ -196,88 +194,46 @@ const AddLine = () => {
                 className="add-line-form"
               >
                 <div className="container add-line-form-container">
-                  {/* Branch and Line Name */}
+                  {/* Line Name (full width since branch is hidden) */}
                   <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
-                        label="Branch"
-                        rules={[{ 
-                          required: true, 
-                          message: ERROR_MESSAGES.LINE.BRANCH_REQUIRED 
-                        }]}
+                        label="Line Name"
+                        name="lineName"
+                        rules={[
+                          { 
+                            required: true, 
+                            message: ERROR_MESSAGES.LINE.LINE_NAME_REQUIRED 
+                          },
+                          { 
+                            pattern: /^[A-Za-z][A-Za-z0-9\s-]*$/, 
+                            message: 'Must start with an alphabet' 
+                          }
+                        ]}
                       >
-                        {branchLoader ? (
-                          <InputWithAddon
-                            icon={<Spin size="small" />}
-                            value="Loading..."
-                            disabled
-                            style={{ 
-                              backgroundColor: '#f5f5f5',
-                              cursor: 'not-allowed',
-                              color: '#999'
-                            }}
-                          />
-                        ) : (
-                          <InputWithAddon
-                            icon={<BankOutlined />}
-                            value={selectedBranchName || "No branch selected"}
-                            placeholder="No branch selected"
-                            disabled
-                            style={{ 
-                              backgroundColor: '#f5f5f5',
-                              cursor: 'not-allowed',
-                              color: '#000'
-                            }}
-                          />
-                        )}
+                        <InputWithAddon
+                          icon={<ApartmentOutlined />}
+                          placeholder="Enter line name"
+                          onValueFilter={(value) => {
+                            if (value.length === 0) return '';
+                            let filtered = '';
+                            for (let i = 0; i < value.length; i++) {
+                              if (i === 0) {
+                                if (/[A-Za-z]/.test(value[i])) {
+                                  filtered += value[i];
+                                }
+                              } else {
+                                if (/[A-Za-z0-9\s-]/.test(value[i])) {
+                                  filtered += value[i];
+                                }
+                              }
+                            }
+                            return filtered;
+                          }}
+                        />
                       </Form.Item>
                     </div>
 
-                    <div className="col-md-6">
-  <Form.Item
-    label="Line Name"
-    name="lineName"
-    rules={[
-      { 
-        required: true, 
-        message: ERROR_MESSAGES.LINE.LINE_NAME_REQUIRED 
-      },
-      { 
-        pattern: /^[A-Za-z][A-Za-z0-9\s-]*$/, 
-        message: 'Must start with an alphabet' 
-      }
-    ]}
-  >
-    <InputWithAddon
-      icon={<ApartmentOutlined />}
-      placeholder="Enter line name"
-      onValueFilter={(value) => {
-        if (value.length === 0) return '';
-        
-        // First character must be alphabet
-        let filtered = '';
-        for (let i = 0; i < value.length; i++) {
-          if (i === 0) {
-            // First character: only alphabets
-            if (/[A-Za-z]/.test(value[i])) {
-              filtered += value[i];
-            }
-          } else {
-            // Subsequent characters: alphabets, numbers, spaces, and hyphens
-            if (/[A-Za-z0-9\s-]/.test(value[i])) {
-              filtered += value[i];
-            }
-          }
-        }
-        return filtered;
-      }}
-    />
-  </Form.Item>
-</div>
-                  </div>
-
-                  {/* Line Type & Installment */}
-                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Line Type"
@@ -300,10 +256,13 @@ const AddLine = () => {
                         </SelectWithAddon>
                       </Form.Item>
                     </div>
+                  </div>
 
+                  {/* No of Installment & No of Addl Installment */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
-                        label="Installment"
+                        label="No of Installment"
                         name="installment"
                         rules={[
                           { 
@@ -329,13 +288,10 @@ const AddLine = () => {
                         />
                       </Form.Item>
                     </div>
-                  </div>
 
-                  {/* Bad Installment */}
-                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
-                        label="No. of Bad Installments"
+                        label="No of Addl Installment"
                         name="badinstallment"
                         rules={[
                           {
@@ -350,7 +306,7 @@ const AddLine = () => {
                       >
                         <InputWithAddon
                           icon={<WarningOutlined />}
-                          placeholder="Enter bad installment count"
+                          placeholder="Enter additional installment count"
                           type="text"
                           inputMode="decimal"
                           onKeyPress={(e) => {

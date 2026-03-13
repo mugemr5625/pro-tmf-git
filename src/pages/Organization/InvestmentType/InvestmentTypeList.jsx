@@ -42,8 +42,8 @@ const InvestmentTypeList = () => {
 
   // ─── Data ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
-  const [allTypes, setAllTypes] = useState([]);       // raw full list
-  const [groupedData, setGroupedData] = useState({});  // grouped by line_name
+  const [allTypes, setAllTypes] = useState([]);
+  const [groupedData, setGroupedData] = useState({});
   const [investmentTypesPagination, setInvestmentTypesPagination] = useState({});
 
   // ─── UI ────────────────────────────────────────────────────────────────────
@@ -54,16 +54,14 @@ const InvestmentTypeList = () => {
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [lineDropdownList, setLineDropdownList] = useState([]);
   const [lineLoading, setLineLoading] = useState(false);
-  const [lineDropdownOpen, setLineDropdownOpen] = useState(false);
-  const [selectedLines, setSelectedLines] = useState([]);
-  const [multiUserFilter, setMultiUserFilter] = useState("all"); // "all" | "yes" | "no"
+  const [selectedLine, setSelectedLine] = useState(null); // single value now
+  const [multiUserFilter, setMultiUserFilter] = useState("all");
   const [searchCriteria, setSearchCriteria] = useState(null);
   const [showReset, setShowReset] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [investmentTitleSearch, setInvestmentTitleSearch] = useState("");
 
   const ITEMS_PAGE_SIZE = 10;
-  const ALL_LINES_VALUE = "__ALL_LINES__";
 
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
@@ -101,7 +99,6 @@ const InvestmentTypeList = () => {
       let branchId;
       try { branchId = JSON.parse(storedBranchId); } catch { branchId = storedBranchId; }
 
-      // Fetch investment types + line dropdown in parallel
       const [typesRes, linesRes] = await Promise.all([
         GET(INVESTMENT_TYPE_API),
         GET(`api/line_dd/?branch_id=${branchId}`),
@@ -176,61 +173,52 @@ const InvestmentTypeList = () => {
     return [...new Set(allTypes.map((t) => t.line_name || "Uncategorized"))].sort();
   };
 
-  const handleLineSelection = (values) => {
-    if (values.includes(ALL_LINES_VALUE)) {
-      setSelectedLines([ALL_LINES_VALUE]);
-    } else {
-      setSelectedLines(values);
+  const handleSearch = () => {
+    let filtered = [...allTypes];
+
+    // Single line filter — null means "All Lines"
+    if (selectedLine) {
+      filtered = filtered.filter((t) => (t.line_name || "Uncategorized") === selectedLine);
+    }
+
+    if (multiUserFilter === "yes") {
+      filtered = filtered.filter((t) => t.multi_user_allocation === true);
+    } else if (multiUserFilter === "no") {
+      filtered = filtered.filter((t) => t.multi_user_allocation === false);
+    }
+
+    if (investmentTitleSearch.trim()) {
+      const query = investmentTitleSearch.trim().toLowerCase();
+      filtered = filtered.filter((t) =>
+        t.investment_title?.toLowerCase().includes(query)
+      );
+    }
+
+    const criteria = {
+      line: selectedLine || "All Lines",
+      multiUser: multiUserFilter,
+      investmentTitle: investmentTitleSearch.trim() || null,
+    };
+
+    setSearchCriteria(criteria);
+
+    const grouped = groupByLine(filtered);
+    setGroupedData(grouped);
+    Object.keys(grouped).forEach((ln) => initializeLinePagination(ln, grouped[ln].length));
+
+    setSearchModalVisible(false);
+    setShowReset(true);
+    setHasSearched(true);
+
+    if (filtered.length === 0) {
+      notification.warning({ message: "No Results", description: "No investment types match the selected filters." });
     }
   };
 
-  const handleSearch = () => {
-  const isAllLines = selectedLines.includes(ALL_LINES_VALUE) || selectedLines.length === 0;
-
-  let filtered = [...allTypes];
-
-  if (!isAllLines && selectedLines.length > 0) {
-    filtered = filtered.filter((t) => selectedLines.includes(t.line_name || "Uncategorized"));
-  }
-
-  if (multiUserFilter === "yes") {
-    filtered = filtered.filter((t) => t.multi_user_allocation === true);
-  } else if (multiUserFilter === "no") {
-    filtered = filtered.filter((t) => t.multi_user_allocation === false);
-  }
-
-  // ← new: filter by investment title
-  if (investmentTitleSearch.trim()) {
-    const query = investmentTitleSearch.trim().toLowerCase();
-    filtered = filtered.filter((t) =>
-      t.investment_title?.toLowerCase().includes(query)
-    );
-  }
-
-  const criteria = {
-    lines: isAllLines ? ["All Lines"] : selectedLines,
-    multiUser: multiUserFilter,
-    investmentTitle: investmentTitleSearch.trim() || null,  // ← new
-  };
-
-  setSearchCriteria(criteria);
-
-  const grouped = groupByLine(filtered);
-  setGroupedData(grouped);
-  Object.keys(grouped).forEach((ln) => initializeLinePagination(ln, grouped[ln].length));
-
-  setSearchModalVisible(false);
-  setShowReset(true);
-  setHasSearched(true);
-
-  if (filtered.length === 0) {
-    notification.warning({ message: "No Results", description: "No investment types match the selected filters." });
-  }
-};
   const handleReset = () => {
     setGroupedData({});
     setInvestmentTypesPagination({});
-    setSelectedLines([]);
+    setSelectedLine(null);
     setInvestmentTitleSearch("");
     setMultiUserFilter("all");
     setSearchCriteria(null);
@@ -272,11 +260,9 @@ const InvestmentTypeList = () => {
         const updated = allTypes.filter((t) => t.id !== record.id);
         setAllTypes(updated);
 
-        // Re-apply current filter
-        const isAllLines = selectedLines.includes(ALL_LINES_VALUE) || selectedLines.length === 0;
         let filtered = [...updated];
-        if (!isAllLines && selectedLines.length > 0) {
-          filtered = filtered.filter((t) => selectedLines.includes(t.line_name || "Uncategorized"));
+        if (selectedLine) {
+          filtered = filtered.filter((t) => (t.line_name || "Uncategorized") === selectedLine);
         }
         if (multiUserFilter === "yes") filtered = filtered.filter((t) => t.multi_user_allocation === true);
         if (multiUserFilter === "no") filtered = filtered.filter((t) => t.multi_user_allocation === false);
@@ -318,40 +304,38 @@ const InvestmentTypeList = () => {
     >
       <div className="inv-type-list-modal-content">
 
-        {/* Line filter */}
+        {/* Line filter — single select */}
         <div>
           <p className="inv-type-list-modal-label">Select Line:</p>
           <Select
-            mode="multiple"
-            value={selectedLines}
-            onChange={handleLineSelection}
+            value={selectedLine}
+            onChange={(value) => setSelectedLine(value ?? null)}
             style={{ width: "100%" }}
-            placeholder="Select line(s)"
+            placeholder="Select a line"
             allowClear
-            maxTagCount="responsive"
+            showSearch
+            size="large"
             loading={lineLoading}
-            open={lineDropdownOpen}
-            onDropdownVisibleChange={(open) => setLineDropdownOpen(open)}
-            dropdownRender={(menu) => (
-              <>
-                {menu}
-                <div style={{ padding: "4px", borderTop: "1px solid #f0f0f0", display: "flex", justifyContent: "center" }}>
-                  <Button
-                    style={{ background: "#28a544", color: "white" }}
-                    size="small"
-                    onClick={() => setLineDropdownOpen(false)}
-                  >
-                    Select Done ✓
-                  </Button>
-                </div>
-              </>
-            )}
+            filterOption={(input, option) =>
+              option.children.toLowerCase().includes(input.toLowerCase())
+            }
           >
-            <Select.Option key={ALL_LINES_VALUE} value={ALL_LINES_VALUE}>All Lines</Select.Option>
             {getUniqueLines().map((ln) => (
               <Select.Option key={ln} value={ln}>{ln}</Select.Option>
             ))}
           </Select>
+        </div>
+
+        {/* Investment Title filter */}
+        <div>
+          <p className="inv-type-list-modal-label">Investment Title:</p>
+          <Input
+            placeholder="Search by investment title"
+            value={investmentTitleSearch}
+            onChange={(e) => setInvestmentTitleSearch(e.target.value)}
+            allowClear
+            size="large"
+          />
         </div>
 
         {/* Multi-user filter */}
@@ -368,17 +352,6 @@ const InvestmentTypeList = () => {
             <Select.Option value="no">No (Single User)</Select.Option>
           </Select>
         </div>
-        <div>
-  <p className="inv-type-list-modal-label">Investment Title:</p>
-  <Input
-    placeholder="Search by investment title"
-    value={investmentTitleSearch}
-    onChange={(e) => setInvestmentTitleSearch(e.target.value)}
-    allowClear
-    size="large"
-    // prefix={<SearchOutlined />}
-  />
-</div>
 
       </div>
     </Modal>
@@ -419,9 +392,9 @@ const InvestmentTypeList = () => {
         <>
           <Divider style={{ margin: "5px 0" }} />
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "8px 0" }}>
-            {searchCriteria.lines && (
+            {searchCriteria.line && (
               <Tag color="blue" style={{ margin: 0, padding: "4px 8px" }}>
-                Line: {searchCriteria.lines.join(", ")}
+                Line: {searchCriteria.line}
               </Tag>
             )}
             <Tag color="green" style={{ margin: 0, padding: "4px 8px" }}>
@@ -433,10 +406,10 @@ const InvestmentTypeList = () => {
                 : "No"}
             </Tag>
             {searchCriteria.investmentTitle && (
-  <Tag color="purple" style={{ margin: 0, padding: "4px 8px" }}>
-    Investment Title: {searchCriteria.investmentTitle}
-  </Tag>
-)}
+              <Tag color="purple" style={{ margin: 0, padding: "4px 8px" }}>
+                Investment Title: {searchCriteria.investmentTitle}
+              </Tag>
+            )}
           </div>
           <Divider style={{ margin: "5px 0" }} />
         </>
